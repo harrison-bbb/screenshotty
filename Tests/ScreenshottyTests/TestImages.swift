@@ -77,3 +77,11 @@ enum Text {
         SensitiveScanner.matches(in: text).map(\.kind)
     }
 }
+
+enum TempFile {
+    static func writePNG(_ image: CGImage) -> URL? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
+        return (try? PNGEncoder.write(image, to: url)) != nil ? url : nil
+    }
+    static func delete(_ url: URL) { try? FileManager.default.removeItem(at: url) }
+}
