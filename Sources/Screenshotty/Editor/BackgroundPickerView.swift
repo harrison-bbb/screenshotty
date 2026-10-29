@@ -3,14 +3,23 @@ import ScreenshottyCore
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct SmartSuggestion: Identifiable, Equatable {
+    var variant: SmartBackground.Variant
+    var style: BackgroundStyle
+    var id: SmartBackground.Variant { variant }
+}
+
 struct BackgroundPickerView: View {
     @Binding var background: BackgroundStyle
-    @State private var tab: Tab = .gradient
+    /// Set while a smart (screenshot-matched) background is chosen.
+    @Binding var smartVariant: SmartBackground.Variant?
+    let smartSuggestions: [SmartSuggestion]
+    @State private var tab: Tab = .smart
     /// Remembers the last custom image so switching tabs doesn't lose it.
     @State private var lastImage: ImageBackgroundSpec?
 
     enum Tab: String, CaseIterable, Identifiable {
-        case gradient = "Gradient", wallpaper = "Mesh", solid = "Solid", image = "Image", none = "None"
+        case smart = "Smart", gradient = "Gradient", wallpaper = "Mesh", solid = "Solid", image = "Image", none = "None"
         var id: String { rawValue }
     }
 
@@ -20,6 +29,7 @@ struct BackgroundPickerView: View {
                 .onChange(of: tab) { _, newTab in switchKind(to: newTab) }
 
             switch tab {
+            case .smart: smartPanel
             case .gradient: gradientPanel
             case .wallpaper: presetGrid(Presets.wallpapers, columns: 4)
             case .solid: solidPanel
@@ -32,12 +42,47 @@ struct BackgroundPickerView: View {
             }
         }
         .onAppear {
-            tab = Self.tab(for: background)
+            tab = smartVariant != nil ? .smart : Self.tab(for: background)
             if case .image(let spec) = background { lastImage = spec }
         }
     }
 
     // MARK: Panels
+
+    private var smartPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 2), spacing: 6) {
+                ForEach(smartSuggestions) { suggestion in
+                    Button {
+                        background = suggestion.style
+                        smartVariant = suggestion.variant
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Group {
+                                if let thumb = ThumbnailCache.shared.image(for: suggestion.style, key: "smart:\(suggestion.style.hashValue)") {
+                                    Image(decorative: thumb, scale: 1).resizable()
+                                } else {
+                                    Color.gray
+                                }
+                            }
+                            .frame(height: 52)
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                            .overlay(selectionRing(smartVariant == suggestion.variant, radius: 7))
+                            Text(suggestion.variant.title)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Colours picked from this screenshot. While a smart look is selected, every new capture gets its own matching background.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
     private var gradientPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -147,8 +192,17 @@ struct BackgroundPickerView: View {
     }
 
     private func switchKind(to newTab: Tab) {
+        if newTab == .smart {
+            if smartVariant == nil, let first = smartSuggestions.first {
+                background = first.style
+                smartVariant = first.variant
+            }
+            return
+        }
+        smartVariant = nil
         guard Self.tab(for: background) != newTab else { return }
         switch newTab {
+        case .smart: break
         case .gradient: background = Presets.gradients[5].style
         case .wallpaper: background = Presets.wallpapers[0].style
         case .solid: background = .solid(.white)

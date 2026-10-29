@@ -8,7 +8,9 @@ struct InspectorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 InspectorSection("Background") {
-                    BackgroundPickerView(background: $model.settings.background)
+                    BackgroundPickerView(background: $model.settings.background,
+                                         smartVariant: $model.settings.smartBackground,
+                                         smartSuggestions: model.smartSuggestions)
                 }
 
                 InspectorSection("Canvas") {

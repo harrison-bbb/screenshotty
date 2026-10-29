@@ -41,6 +41,7 @@ public enum Compositor {
     /// Prepares the shot (trim and even inner margin, if enabled), draws annotations and renders in one step.
     public static func compose(_ source: CGImage, settings: CompositionSettings, annotations: [Annotation] = [],
                                scale: CGFloat = 1) throws -> CGImage {
+        let settings = settings.resolved(for: source)
         let prepared = ShotPreparer.prepareShot(source, settings: settings)
         let shot = AnnotationRenderer.apply(annotations, to: prepared.image, offset: prepared.offset)
         return try render(shot, settings: settings, scale: scale)

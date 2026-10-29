@@ -22,6 +22,7 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 
 - **Capture with one shortcut.** Press <kbd>⌘</kbd><kbd>⇧</kbd><kbd>2</kbd> and select an area. Press <kbd>Space</kbd> to pick a window. It is the same picker as the built-in screenshot tool.
 - **Auto-trim and balance.** Uneven plain margins are removed and replaced with an even inner margin in the screenshot's own background colour. Tight crops of text get breathing room, and rounded corners never clip your content. The result is centred to the pixel.
+- **Smart backgrounds.** Vibrant, mesh, pastel and dark looks generated from your screenshot's own colours. Pick one and every new capture gets its own matching background.
 - **Backgrounds.** 16 gradients, 8 mesh wallpapers, solid colours, your own image or desktop wallpaper (with blur), or transparent.
 - **Social-ready sizes.** Auto, 1:1, 4:5, 4:3, 3:2, 16:9, 1.91:1 (LinkedIn and Open Graph) and 9:16.
 - **Styling.** Rounded corners, soft to strong shadows, macOS window chrome in light or dark, and a hairline or frosted-glass frame.
@@ -105,6 +106,7 @@ The app binary doubles as a command line tool:
 ```bash
 alias screenshotty=/Applications/Screenshotty.app/Contents/MacOS/Screenshotty
 screenshotty render shot.png -o pretty.png --preset tahoe --aspect 16:9 --chrome dark --frame glass
+screenshotty render shot.png --smart mesh
 screenshotty render --help
 ```
 

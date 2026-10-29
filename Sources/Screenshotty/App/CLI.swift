@@ -36,6 +36,11 @@ enum CLI {
                 guard let hex = value(), let color = RGBAColor(hex: hex) else { return fail("Invalid colour") }
                 settings.background = .solid(color)
             case "--transparent": settings.background = .transparent
+            case "--smart":
+                guard let v = value().flatMap(SmartBackground.Variant.init(rawValue:)) else {
+                    return fail("Unknown smart style. Available: \(SmartBackground.Variant.allCases.map(\.rawValue).joined(separator: ", "))")
+                }
+                settings.smartBackground = v
             case "--aspect":
                 guard let v = value(), let aspect = AspectRatio(rawValue: v) else {
                     return fail("Unknown aspect. Available: \(AspectRatio.allCases.map(\.rawValue).joined(separator: ", "))")
@@ -94,6 +99,7 @@ enum CLI {
     Options:
       --preset <id>        Background preset (\(Presets.all.map(\.id).joined(separator: ", ")))
       --color <hex>        Solid background colour, e.g. #FFFFFF
+      --smart <style>      Background matched to the screenshot's colours: vibrant, mesh, pastel, dark
       --transparent        No background
       --aspect <ratio>     \(AspectRatio.allCases.map(\.rawValue).joined(separator: ", "))
       --padding <units>    Padding, in 1/1000ths of the screenshot's longest side (default 90)

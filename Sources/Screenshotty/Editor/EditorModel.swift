@@ -55,6 +55,11 @@ final class EditorModel: ObservableObject {
     @Published var settings: CompositionSettings {
         didSet {
             guard settings != oldValue else { return }
+            // Picking any non-matched background turns smart mode off.
+            if let variant = settings.smartBackground,
+               settings.background != smartSuggestions.first(where: { $0.variant == variant })?.style {
+                settings.smartBackground = nil // no re-entry: Swift doesn't re-run didSet from inside it
+            }
             Preferences.shared.lastSettings = settings
             if settings.autoTrim != oldValue.autoTrim || settings.innerPadding != oldValue.innerPadding
                 || settings.effectiveCornerRadius != oldValue.effectiveCornerRadius {
@@ -85,6 +90,9 @@ final class EditorModel: ObservableObject {
     private var undoStack: [[Annotation]] = []
     private var redoStack: [[Annotation]] = []
 
+    /// Backgrounds generated from this screenshot's colours.
+    @Published private(set) var smartSuggestions: [SmartSuggestion] = []
+
     /// True when the screenshot sits on a plain background, so the inner margin applies.
     @Published private(set) var hasPlainBackground = false
 
@@ -99,8 +107,17 @@ final class EditorModel: ObservableObject {
     init(image: CGImage, settings: CompositionSettings) {
         source = image
         prepared = PreparedShot(image: image, offset: .zero)
-        self.settings = settings
+        smartSuggestions = Self.suggestions(for: image)
+        // A smart look from last time is re-matched to this screenshot.
+        self.settings = settings.resolved(for: image)
         updateShot()
+    }
+
+    private static func suggestions(for image: CGImage) -> [SmartSuggestion] {
+        let palette = SmartBackground.palette(of: image)
+        return SmartBackground.Variant.allCases.map {
+            SmartSuggestion(variant: $0, style: SmartBackground.style(for: palette, variant: $0))
+        }
     }
 
     var layout: CompositionLayout {
@@ -116,6 +133,8 @@ final class EditorModel: ObservableObject {
     func replaceImage(_ image: CGImage) {
         source = image
         analysis = nil
+        smartSuggestions = Self.suggestions(for: image)
+        if settings.smartBackground != nil { settings = settings.resolved(for: image) }
         recordUndo()
         annotations = []
         selectedID = nil

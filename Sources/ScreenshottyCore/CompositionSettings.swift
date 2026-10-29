@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Target shape of the exported canvas.
@@ -104,6 +105,8 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
     /// Even margin added inside the card, in the screenshot's own background colour, when the
     /// screenshot is content on a plain background (e.g. text). Units of the trimmed content.
     public var innerPadding: Double
+    /// When set, the background is generated from each screenshot's own colours with this look.
+    public var smartBackground: SmartBackground.Variant?
 
     public init(background: BackgroundStyle = Presets.defaultBackground,
                 aspectRatio: AspectRatio = .auto,
@@ -113,7 +116,8 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
                 windowChrome: WindowChromeStyle = .none,
                 frame: FrameStyle = .none,
                 autoTrim: Bool = true,
-                innerPadding: Double = 40) {
+                innerPadding: Double = 40,
+                smartBackground: SmartBackground.Variant? = nil) {
         self.background = background
         self.aspectRatio = aspectRatio
         self.padding = padding
@@ -123,6 +127,15 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         self.frame = frame
         self.autoTrim = autoTrim
         self.innerPadding = innerPadding
+        self.smartBackground = smartBackground
+    }
+
+    /// These settings with the background resolved for `image` when a smart background is chosen.
+    public func resolved(for image: CGImage) -> CompositionSettings {
+        guard let variant = smartBackground else { return self }
+        var copy = self
+        copy.background = SmartBackground.style(for: image, variant: variant)
+        return copy
     }
 
     public static let `default` = CompositionSettings()
@@ -143,6 +156,7 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
     // Tolerant decoding: missing keys fall back to defaults so old saved settings keep working.
     private enum CodingKeys: String, CodingKey {
         case background, aspectRatio, padding, cornerRadius, shadow, windowChrome, frame, autoTrim, innerPadding
+        case smartBackground
     }
 
     public init(from decoder: Decoder) throws {
@@ -157,5 +171,6 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         frame = (try? c.decode(FrameStyle.self, forKey: .frame)) ?? d.frame
         autoTrim = (try? c.decode(Bool.self, forKey: .autoTrim)) ?? d.autoTrim
         innerPadding = (try? c.decode(Double.self, forKey: .innerPadding)) ?? d.innerPadding
+        smartBackground = try? c.decode(SmartBackground.Variant.self, forKey: .smartBackground)
     }
 }

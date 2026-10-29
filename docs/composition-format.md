@@ -36,6 +36,7 @@ Every key is optional. Missing keys use the defaults shown above.
 | `windowChrome` | `none`, `light`, `dark` |
 | `frame` | `none`, `hairline`, `glass` |
 | `autoTrim` | `true` or `false` |
+| `smartBackground` | Optional: `vibrant`, `mesh`, `pastel` or `dark`. When set, `background` is regenerated from each screenshot's colours (see below). |
 | `innerPadding` | 0 to 150 units of the trimmed content. Only used when a plain background is detected. |
 
 Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
@@ -61,3 +62,22 @@ Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
 7. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.
 
 Shadow parameters (blur, y-offset, opacity) are: soft (30, 8, 0.22), medium (50, 18, 0.35), strong (70, 28, 0.5).
+
+## Smart backgrounds
+
+1. Downscale the screenshot to at most 96 px on its longest side.
+2. Ignore pixels that are mostly transparent, have saturation below 0.25 or brightness below 0.25.
+3. Sort the rest into 36 hue bins, each pixel weighted by saturation² × brightness. Smooth each bin with half of each neighbour.
+4. The primary hue is the strongest bin. The secondary is the strongest bin at least 40° away with at least 20% of the primary's weight, or primary + 35°. It is then pulled to within 60° of the primary so gradients never turn muddy.
+5. With almost no colourful pixels (fewer than 1 in 400), use hues 230° and 270° with saturation scaled by 0.35.
+
+Each look is built from those two hues in HSB:
+
+| Variant | Background |
+| --- | --- |
+| `vibrant` | Linear gradient at 135°: (h1, 0.60, 0.97) to (h2, 0.72, 0.82) |
+| `mesh` | Base (h1, 0.55, 0.88) with four blobs around the corners |
+| `pastel` | Linear gradient at 160°: (h1, 0.16, 1.0) to (h2, 0.26, 0.97) |
+| `dark` | Base (h1, 0.55, 0.12) with glowing blobs (h1, 0.75, 0.55) and (h2, 0.75, 0.42) |
+
+The exact blob positions are in `Sources/ScreenshottyCore/SmartBackground.swift`.
