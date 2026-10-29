@@ -279,15 +279,90 @@ final class EditorModel: ObservableObject {
         return CGPoint(x: point.x + image.minX + prepared.offset.x, y: point.y + image.minY + prepared.offset.y)
     }
 
+    /// Layout unit of the prepared shot (annotations are drawn on it), in capture pixels.
+    var annotationUnit: CGFloat { CGFloat(max(prepared.image.width, prepared.image.height)) / 1000 }
+
     /// Stroke width of arrows and boxes, in canvas pixels.
-    var annotationStrokeWidth: CGFloat {
-        AnnotationRenderer.strokeWidth(unit: CGFloat(max(prepared.image.width, prepared.image.height)) / 1000)
-    }
+    var annotationStrokeWidth: CGFloat { AnnotationRenderer.strokeWidth(unit: annotationUnit) }
 
     // MARK: Editing annotations
 
     func annotation(at point: CGPoint, tolerance: CGFloat) -> Annotation? {
-        annotations.last { $0.hitTest(point, tolerance: tolerance) }
+        annotations.last { $0.hitTest(point, tolerance: tolerance, unit: annotationUnit) }
+    }
+
+    /// Selects an annotation and shows its colour and size in the toolbar.
+    func select(_ id: UUID?) {
+        selectedID = id
+        guard let id, let annotation = annotations.first(where: { $0.id == id }) else { return }
+        if annotation.kind.usesColor { annotationColor = annotation.color }
+        if annotation.kind.isPlaced { textSize = annotation.size }
+    }
+
+    // MARK: Text and steps
+
+    /// Size used for new text labels and steps; changing it resizes the selected one.
+    @Published var textSize: Double = Annotation.defaultTextSize {
+        didSet {
+            guard let id = selectedID, let index = annotations.firstIndex(where: { $0.id == id }),
+                  annotations[index].kind.isPlaced, annotations[index].size != textSize else { return }
+            recordUndo()
+            annotations[index].size = textSize
+        }
+    }
+
+    /// A text label being typed: a new one at `point`, or an existing one (`id`).
+    struct TextEditing: Equatable {
+        var id: UUID?
+        var point: CGPoint
+        var text: String
+    }
+    @Published var textEditing: TextEditing?
+
+    /// True while a text field in the editor has focus: single-key tool shortcuts step aside.
+    @Published var isTyping = false
+
+    func placeStep(at point: CGPoint) {
+        add(Annotation(kind: .step, start: point, end: point, color: annotationColor, size: textSize))
+    }
+
+    func beginText(at point: CGPoint) {
+        textEditing = TextEditing(id: nil, point: point, text: "")
+    }
+
+    func editText(_ id: UUID) {
+        guard let annotation = annotations.first(where: { $0.id == id }), annotation.kind == .text else { return }
+        select(id)
+        textEditing = TextEditing(id: id, point: annotation.start, text: annotation.text)
+    }
+
+    func commitText() {
+        guard let editing = textEditing else { return }
+        textEditing = nil
+        let text = editing.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let id = editing.id, let index = annotations.firstIndex(where: { $0.id == id }) {
+            guard annotations[index].text != text else { return }
+            recordUndo()
+            if text.isEmpty { annotations.remove(at: index); selectedID = nil } else { annotations[index].text = text }
+        } else if !text.isEmpty {
+            add(Annotation(kind: .text, start: editing.point, end: editing.point, color: annotationColor,
+                           text: text, size: textSize))
+        }
+    }
+
+    func cancelText() { textEditing = nil }
+
+    /// The `.screenshotty` file this editor was opened from or last saved to.
+    var projectURL: URL?
+
+    /// Restores a project's annotations and crop as the starting point (not an undoable change).
+    func loadProject(annotations marks: [Annotation], crop: CGRect?) {
+        isRestoring = true
+        annotations = marks
+        setCrop(crop)
+        isRestoring = false
+        undoStack.removeAll()
+        redoStack.removeAll()
     }
 
     /// Annotations carried over from the quick preview (e.g. sensitive info it already hid).

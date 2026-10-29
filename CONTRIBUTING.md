@@ -23,7 +23,7 @@ captures silently come back empty. Capture diagnostics go to `~/Library/Logs/Scr
 
 | Folder | What lives there |
 | --- | --- |
-| `Sources/ScreenshottyCore` | Everything that decides how the image looks, with no AppKit: the settings model and styles, presets and smart backgrounds, edge repair and auto-trim, layout, devices and window chrome, annotations, sensitive-info scanning, and the Core Graphics compositor. A future Windows version can port this folder as a reference. |
+| `Sources/ScreenshottyCore` | Everything that decides how the image looks, with no AppKit: the settings model and styles, presets and smart backgrounds, edge repair and auto-trim, layout, devices and window chrome, annotations, watermarks, sensitive-info scanning, the style and project file formats, and the Core Graphics compositor. A future Windows version can port this folder as a reference. |
 | `Sources/Screenshotty/App` | App entry point, menu bar item, main menu, batch export, windows and the CLI. |
 | `Sources/Screenshotty/Capture` | Capture via `/usr/sbin/screencapture`, the global hotkey, and the floating preview card. |
 | `Sources/Screenshotty/Editor` | The editor window: canvas, annotation tools, crop, inspector, style cards, background picker and export. |

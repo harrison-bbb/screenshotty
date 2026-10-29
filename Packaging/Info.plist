@@ -26,6 +26,47 @@
             <key>LSItemContentTypes</key>
             <array><string>public.image</string></array>
         </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>Screenshotty Project</string>
+            <key>CFBundleTypeRole</key><string>Editor</string>
+            <key>LSHandlerRank</key><string>Owner</string>
+            <key>CFBundleTypeIconFile</key><string>AppIcon</string>
+            <key>LSItemContentTypes</key>
+            <array><string>com.screenshotty.project</string></array>
+        </dict>
+        <dict>
+            <key>CFBundleTypeName</key><string>Screenshotty Style</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Owner</string>
+            <key>CFBundleTypeIconFile</key><string>AppIcon</string>
+            <key>LSItemContentTypes</key>
+            <array><string>com.screenshotty.style</string></array>
+        </dict>
+    </array>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>com.screenshotty.project</string>
+            <key>UTTypeDescription</key><string>Screenshotty Project</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.json</string><string>public.data</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array><string>screenshotty</string></array>
+            </dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key><string>com.screenshotty.style</string>
+            <key>UTTypeDescription</key><string>Screenshotty Style</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.json</string><string>public.data</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array><string>screenshotty-style</string></array>
+            </dict>
+        </dict>
     </array>
 </dict>
 </plist>

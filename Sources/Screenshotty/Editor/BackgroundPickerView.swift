@@ -96,7 +96,8 @@ struct BackgroundPickerView: View {
     private var solidPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
-                ForEach(Presets.solids, id: \.self) { color in
+                ForEach(Preferences.shared.brandKit.colors + Presets.solids.filter { !Preferences.shared.brandKit.colors.contains($0) },
+                        id: \.self) { color in
                     Button { background = .solid(color) } label: {
                         RoundedRectangle(cornerRadius: 6)
                             .fill(color.swiftUIColor)

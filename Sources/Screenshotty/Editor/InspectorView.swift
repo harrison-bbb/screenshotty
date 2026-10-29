@@ -20,12 +20,16 @@ struct InspectorView: View {
                 InspectorSection("Frame") {
                     TilePicker(title: "Mockup", selection: $model.settings.device,
                                options: DeviceStyle.allCases, label: \.title, symbol: \.symbol)
-                    WindowControl(settings: $model.settings)
+                    WindowControl(settings: $model.settings, isTyping: $model.isTyping)
                     LabeledPicker(title: "Shadow", selection: $model.settings.shadow)
                     if model.settings.device == .none {
                         CornerRadiusControl(settings: $model.settings)
                         LabeledPicker(title: "Border", selection: $model.settings.frame)
                     }
+                }
+
+                InspectorSection("Watermark") {
+                    WatermarkControl(settings: $model.settings, isTyping: $model.isTyping)
                 }
 
                 InspectorSection("Layout") {
@@ -185,6 +189,8 @@ extension Optional where Wrapped == Int {
 /// Window chrome: none, a macOS title bar, or a browser with an address bar, in light or dark.
 struct WindowControl: View {
     @Binding var settings: CompositionSettings
+    @Binding var isTyping: Bool
+    @FocusState private var addressFocused: Bool
 
     var body: some View {
         let chrome = settings.windowChrome
@@ -202,6 +208,8 @@ struct WindowControl: View {
                 TextField("Address, e.g. yourapp.com", text: $settings.browserURL)
                     .textFieldStyle(.roundedBorder)
                     .font(.callout)
+                    .focused($addressFocused)
+                    .onChange(of: addressFocused) { _, focused in isTyping = focused }
             }
         }
     }
@@ -349,6 +357,65 @@ struct CornerRadiusControl: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+}
+
+/// Turns the watermark on from the brand kit, and adjusts what it shows and where.
+struct WatermarkControl: View {
+    @Binding var settings: CompositionSettings
+    @Binding var isTyping: Bool
+    @ObservedObject private var prefs = Preferences.shared
+    @FocusState private var textFocused: Bool
+
+    var body: some View {
+        let kit = prefs.brandKit
+        Toggle("Show watermark", isOn: Binding(
+            get: { settings.watermark != nil },
+            set: { on in
+                if on {
+                    var mark = kit.watermark
+                    if mark.isEmpty { mark.text = "yourapp.com" }
+                    settings.watermark = mark
+                } else {
+                    settings.watermark = nil
+                }
+            }))
+        if kit.logoPath == nil && kit.name.isEmpty {
+            Button("Add your logo and name in Settings…") { WindowManager.shared.showSettings() }
+                .buttonStyle(.link)
+                .font(.callout)
+        }
+        if let mark = settings.watermark {
+            if kit.logoPath != nil {
+                Toggle("Logo", isOn: Binding(get: { mark.logoPath != nil },
+                                             set: { settings.watermark?.logoPath = $0 ? kit.logoPath : nil }))
+            }
+            TextField("Text", text: Binding(get: { settings.watermark?.text ?? "" },
+                                            set: { settings.watermark?.text = $0 }),
+                      prompt: Text("Name, handle or URL"))
+                .textFieldStyle(.roundedBorder)
+                .focused($textFocused)
+                .onChange(of: textFocused) { _, focused in isTyping = focused }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Position").font(.callout)
+                CompactTabBar(selection: Binding(get: { mark.position }, set: { settings.watermark?.position = $0 }),
+                              options: Watermark.Position.allCases, title: \.shortTitle)
+            }
+            LabeledSlider(title: "Size", value: Binding(get: { mark.size }, set: { settings.watermark?.size = $0.rounded() }),
+                          range: Watermark.sizeRange)
+        }
+    }
+}
+
+extension Watermark.Position {
+    var shortTitle: String {
+        switch self {
+        case .topLeft: "↖"
+        case .topRight: "↗"
+        case .bottomLeft: "↙"
+        case .bottomCenter: "↓"
+        case .bottomRight: "↘"
         }
     }
 }

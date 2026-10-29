@@ -12,6 +12,15 @@ enum CLI {
         var output: String?
         var settings = CompositionSettings.default
         var upscale = true
+        // A project brings its own look, crop and annotations; options below still override the look.
+        var project: ProjectDocument?
+        if let path = args.first(where: { $0.hasSuffix("." + ProjectDocument.fileExtension) }) {
+            guard let data = FileManager.default.contents(atPath: path), let document = try? ProjectDocument.decode(data) else {
+                return fail("Could not read the project \(path)")
+            }
+            project = document
+            settings = document.settings(unpackingInto: FileManager.default.temporaryDirectory.appendingPathComponent("screenshotty-assets"))
+        }
         var redact = false
         var i = 0
 
@@ -80,6 +89,27 @@ enum CLI {
                     return fail("Unknown style. Available: \(Style.builtIn.map { String($0.id.dropFirst(8)) }.joined(separator: ", "))")
                 }
                 settings = style.settings
+            case "--watermark":
+                guard let v = value() else { return fail("Missing watermark text") }
+                var mark = settings.watermark ?? Watermark()
+                mark.text = v
+                settings.watermark = mark
+            case "--logo":
+                guard let v = value(), FileManager.default.fileExists(atPath: v) else { return fail("Logo file not found") }
+                var mark = settings.watermark ?? Watermark()
+                mark.logoPath = (v as NSString).expandingTildeInPath
+                settings.watermark = mark
+            case "--watermark-position":
+                guard let v = value().flatMap(Watermark.Position.init(rawValue:)) else {
+                    return fail("Watermark position: \(Watermark.Position.allCases.map(\.rawValue).joined(separator: ", "))")
+                }
+                var mark = settings.watermark ?? Watermark()
+                mark.position = v
+                settings.watermark = mark
+            case "--style-file":
+                guard let path = value(), let data = FileManager.default.contents(atPath: path),
+                      let document = try? StyleDocument.decode(data) else { return fail("Could not read the style file") }
+                settings = document.style(unpackingInto: FileManager.default.temporaryDirectory.appendingPathComponent("screenshotty-assets")).settings
             case "--redact":
                 redact = true
             case "--frame":
@@ -101,16 +131,16 @@ enum CLI {
         }
 
         guard let input else { return fail(usage) }
-        guard let image = ImageLoader.load(URL(fileURLWithPath: input)) else { return fail("Could not read \(input)") }
+        guard let image = project?.capture ?? ImageLoader.load(URL(fileURLWithPath: input)) else { return fail("Could not read \(input)") }
         let outPath = output ?? (input as NSString).deletingPathExtension + "-screenshotty.png"
         do {
-            var annotations: [Annotation] = []
+            var annotations = project?.annotations ?? []
             if redact {
                 let findings = SensitiveScanner.scan(image)
-                annotations = findings.map(\.redaction)
+                annotations += findings.map(\.redaction)
                 for finding in findings { print("Redacted \(finding.kind.singularTitle): \(finding.masked)") }
             }
-            let result = try Compositor.compose(image, settings: settings, annotations: annotations,
+            let result = try Compositor.compose(image, settings: settings, annotations: annotations, crop: project?.crop,
                                                minimumLongSide: upscale ? ExportScale.defaultMinimumLongSide : nil)
             try PNGEncoder.write(result, to: URL(fileURLWithPath: outPath))
             print("\(outPath) (\(result.width)×\(result.height))")
@@ -126,7 +156,7 @@ enum CLI {
     }
 
     static let usage = """
-    Usage: Screenshotty render <input> [-o output.png] [options]
+    Usage: Screenshotty render <image or .screenshotty project> [-o output.png] [options]
 
     Options:
       --preset <id>        Background preset (\(Presets.all.map(\.id).joined(separator: ", ")))
@@ -141,7 +171,11 @@ enum CLI {
       --url <text>         Address shown in the browser window chrome
       --device <name>      none, macbook, iphone
       --width <pixels>     Exact export width (height follows the canvas shape)
+      --style-file <file>  A shared .screenshotty-style file
       --style <id>         A built-in style: \(Style.builtIn.map { String($0.id.dropFirst(8)) }.joined(separator: ", "))
+      --watermark <text>   Text in a corner of the canvas, e.g. @yourhandle or yourapp.com
+      --logo <file>        Logo image in a corner of the canvas (with --watermark, the text follows it)
+      --watermark-position \(Watermark.Position.allCases.map(\.rawValue).joined(separator: ", ")) (default bottomRight)
       --redact             Find emails, API keys, card numbers and similar, and cover them before export
       --frame <style>      none, hairline, glass
       --inner <units>      Even inner margin for screenshots on a plain background (default 40)

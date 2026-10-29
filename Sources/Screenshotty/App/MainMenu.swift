@@ -23,12 +23,15 @@ enum MainMenu {
         file.addItem(withTitle: "New Capture", action: #selector(AppDelegate.captureInteractive), keyEquivalent: "n")
         let full = file.addItem(withTitle: "Capture Full Screen", action: #selector(AppDelegate.captureFullScreen), keyEquivalent: "n")
         full.keyEquivalentModifierMask = [.command, .shift]
-        file.addItem(withTitle: "Open Image…", action: #selector(AppDelegate.openImage), keyEquivalent: "o")
+        file.addItem(withTitle: "Open…", action: #selector(AppDelegate.openImage), keyEquivalent: "o")
         file.addItem(withTitle: "Batch Export…", action: #selector(AppDelegate.batchExport), keyEquivalent: "")
+        file.addItem(withTitle: "Import Style…", action: #selector(AppDelegate.importStyle), keyEquivalent: "")
         file.addItem(.separator())
         file.addItem(withTitle: "Save", action: #selector(EditorWindowController.saveImage(_:)), keyEquivalent: "s")
         let saveAs = file.addItem(withTitle: "Save As…", action: #selector(EditorWindowController.saveImageAs(_:)), keyEquivalent: "s")
         saveAs.keyEquivalentModifierMask = [.command, .shift]
+        let saveProject = file.addItem(withTitle: "Save Project…", action: #selector(EditorWindowController.saveProject(_:)), keyEquivalent: "s")
+        saveProject.keyEquivalentModifierMask = [.command, .option]
         file.addItem(.separator())
         file.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         main.addItem(submenu: file, title: "File")

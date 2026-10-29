@@ -7,8 +7,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
     var onClose: (() -> Void)?
 
     @MainActor
-    init(image: CGImage) {
-        model = EditorModel(image: image, settings: Preferences.shared.lastSettings)
+    init(image: CGImage, settings: CompositionSettings? = nil) {
+        model = EditorModel(image: image, settings: settings ?? Preferences.shared.lastSettings)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 760),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                               backing: .buffered, defer: false)
@@ -23,7 +23,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         let actions = EditorActions(
             copy: { [weak self] in self?.copyImage(nil) },
             save: { [weak self] in self?.saveImage(nil) },
-            saveAs: { [weak self] in self?.saveImageAs(nil) })
+            saveAs: { [weak self] in self?.saveImageAs(nil) },
+            saveProject: { [weak self] in self?.saveProject(nil) })
         window.contentViewController = NSHostingController(rootView: EditorView(model: model, actions: actions))
         window.setContentSize(NSSize(width: 1180, height: 760))
         window.delegate = self
@@ -61,6 +62,37 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         Exporter.saveWithPanel(image, from: window, directory: Preferences.shared.saveFolder)
     }
 
+    /// Saves a re-editable `.screenshotty` file: straight back to the file it came from, or via a panel.
+    @MainActor @objc func saveProject(_ sender: Any?) {
+        guard let document = ProjectDocument(image: model.source, settings: model.settings,
+                                             annotations: model.annotations, crop: model.crop) else { return }
+        let write: (URL) -> Void = { [weak self] url in
+            do {
+                try document.encoded().write(to: url, options: .atomic)
+                self?.model.projectURL = url
+                self?.window?.representedURL = url
+                self?.window?.title = url.deletingPathExtension().lastPathComponent
+                Toast.show("Saved \(url.lastPathComponent)")
+            } catch {
+                self?.presentError(error)
+            }
+        }
+        if let url = model.projectURL {
+            write(url)
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.screenshottyProject]
+        panel.nameFieldStringValue = Exporter.defaultFileName() + "." + ProjectDocument.fileExtension
+        panel.directoryURL = Preferences.shared.saveFolder
+        panel.message = "A project keeps the crop, annotations and style editable."
+        guard let window else { return }
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let url = panel.url else { return }
+            MainActor.assumeIsolated { write(url) }
+        }
+    }
+
     @MainActor @objc func pasteImage(_ sender: Any?) {
         if let image = AppDelegate.clipboardImage() { model.replaceImage(image) }
     }
@@ -76,13 +108,18 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         MainActor.assumeIsolated {
+            // While typing (a text label, the browser address), Copy, Paste, Undo and Delete belong to the text.
+            let typing = window?.firstResponder is NSText
+            let textActions: [Selector] = [#selector(copyImage(_:)), #selector(pasteImage(_:)), #selector(undoAnnotation(_:)),
+                                            #selector(redoAnnotation(_:)), #selector(deleteAnnotation(_:))]
+            if typing, let action = menuItem.action, textActions.contains(action) { return false }
             switch menuItem.action {
-            case #selector(pasteImage(_:)): AppDelegate.clipboardImage() != nil
-            case #selector(undoAnnotation(_:)): model.canUndo
-            case #selector(redoAnnotation(_:)): model.canRedo
-            case #selector(deleteAnnotation(_:)): model.selectedID != nil
-            case #selector(clearAnnotations(_:)): !model.annotations.isEmpty
-            default: true
+            case #selector(pasteImage(_:)): return AppDelegate.clipboardImage() != nil
+            case #selector(undoAnnotation(_:)): return model.canUndo
+            case #selector(redoAnnotation(_:)): return model.canRedo
+            case #selector(deleteAnnotation(_:)): return model.selectedID != nil
+            case #selector(clearAnnotations(_:)): return !model.annotations.isEmpty
+            default: return true
             }
         }
     }
@@ -102,4 +139,5 @@ struct EditorActions {
     var copy: () -> Void
     var save: () -> Void
     var saveAs: () -> Void
+    var saveProject: () -> Void
 }

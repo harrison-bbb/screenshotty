@@ -40,6 +40,7 @@ Every key is optional. Missing keys use the defaults shown above.
 | `frame` | `none`, `hairline`, `glass` |
 | `autoTrim` | `true` or `false` |
 | `smartBackground` | Optional: `vibrant`, `mesh`, `pastel` or `dark`. When set, `background` is regenerated from each screenshot's colours (see below). |
+| `watermark` | Optional: `logoPath` (image file), `text`, `position` (`topLeft`, `topRight`, `bottomLeft`, `bottomCenter`, `bottomRight`), `size` (height in units, default 30) and `opacity` (default 0.9). |
 | `innerPadding` | 0 to 150 units of the trimmed content. Only used when a plain background is detected. |
 
 Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
@@ -123,3 +124,51 @@ against these patterns, first match wins, with no overlaps:
 - **IP address:** IPv4.
 
 Each match's box is padded by a quarter of its height and covered with a `redact` or `blur` annotation.
+
+## Annotations
+
+Annotations use the **original capture's pixels** (top-left origin), so they stay on their content
+through crops, trims and style changes.
+
+| Key | Values |
+| --- | --- |
+| `kind` | `arrow`, `box`, `blur`, `redact`, `text`, `step` |
+| `start`, `end` | `[x, y]`. Arrows run from start to end; boxes, blur and redact fill the rectangle between them. Text is anchored at `start` (its top-left corner); a step is centred on `start`. |
+| `color` | Hex colour (not used by blur and redact). |
+| `text` | The label of a text annotation. Newlines make extra lines. |
+| `size` | Text and step size in units of the prepared shot (default 24; the editor offers 18, 24 and 34). |
+
+Text labels are drawn on a pill of their colour, with white text, or near-black text on light colours. The pill
+pads the text by 0.5× the font size across and 0.32× down, with lines 1.25× the font size apart. Steps are
+circles of radius 0.85× the font size with a white ring, numbered 1, 2, 3… in the order they appear in the list.
+
+## Watermark
+
+The watermark is drawn on the canvas, `size` units tall: the logo (scaled to that height) then the text at 62%
+of it, 0.35× the height apart. It sits in the chosen corner, centred in the top or bottom padding where there's
+room (at most 60 units and at least 16 units from the edge). Text is white over dark backgrounds and near-black
+over light ones, judged from the pixels under it.
+
+## Style files (`.screenshotty-style`)
+
+```json
+{ "format": "screenshotty-style", "version": 1,
+  "style": { "id": "…", "name": "Acme launch", "settings": { … } },
+  "assets": { "1f2e3d4c5b6a7980.png": "<base64>" } }
+```
+
+Images the style uses (a background image, a watermark logo) are embedded under `assets`, and their paths in
+`settings` read `asset:<name>`. Names are a 64-bit FNV-1a hash of the file's contents, so a logo is stored once.
+A team styles folder is any folder of these files.
+
+## Project files (`.screenshotty`)
+
+```json
+{ "format": "screenshotty-project", "version": 1,
+  "image": "<base64 PNG of the original capture>",
+  "settings": { … }, "annotations": [ … ], "crop": [[x, y], [width, height]],
+  "assets": { … } }
+```
+
+`crop` is optional, in capture pixels. Rendering a project is: crop, prepare (edge repair is skipped when there is
+a crop), draw annotations, compose.

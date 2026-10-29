@@ -21,6 +21,23 @@ final class WindowManager {
         present(controller.window!)
     }
 
+    /// Opens a `.screenshotty` project with its crop, annotations and look restored.
+    func openProject(_ url: URL) throws {
+        let document = try ProjectDocument.decode(Data(contentsOf: url))
+        guard let image = document.capture else { throw CocoaError(.fileReadCorruptFile) }
+        let controller = EditorWindowController(image: image, settings: document.settings(unpackingInto: Preferences.importedFolder))
+        controller.model.loadProject(annotations: document.annotations, crop: document.crop)
+        controller.model.projectURL = url
+        controller.window?.representedURL = url
+        controller.window?.title = url.deletingPathExtension().lastPathComponent
+        controller.onClose = { [weak self, weak controller] in
+            self?.editors.removeAll { $0 === controller }
+        }
+        editors.append(controller)
+        present(controller.window!)
+        NSDocumentController.shared.noteNewRecentDocumentURL(url)
+    }
+
     func showSettings() {
         if settingsWindow == nil {
             let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView()))

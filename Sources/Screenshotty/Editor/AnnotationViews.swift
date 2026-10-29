@@ -14,13 +14,18 @@ struct AnnotationOverlay: View {
 
     private enum DragState {
         case drawing(start: CGPoint)
-        case moving(id: UUID, last: CGPoint)
+        /// Text or step tool: a click places one where the pointer went down.
+        case placing(CGPoint)
+        /// `began` turns true on the first real movement, so a plain click adds no undo step.
+        case moving(id: UUID, last: CGPoint, began: Bool)
         /// Select tool on empty canvas: becomes a drag of the finished image once the pointer moves.
         case idle
     }
 
     /// Where the gesture that started a drag-out began, so its later events are ignored.
     @State private var dragOutStart: CGPoint?
+    /// The last annotation clicked and when, to spot double-clicks on text labels.
+    @State private var lastClick: (id: UUID, time: Date)?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -29,16 +34,22 @@ struct AnnotationOverlay: View {
             if let draft {
                 DraftShape(annotation: draft, model: model, scale: scale)
             }
-            if let id = model.selectedID, let selected = model.annotations.first(where: { $0.id == id }) {
+            if let id = model.selectedID, model.textEditing?.id != id,
+               let selected = model.annotations.first(where: { $0.id == id }) {
                 SelectionOutline(annotation: selected, model: model, scale: scale)
+            }
+            if model.textEditing != nil {
+                TextLabelEditor(model: model, scale: scale)
             }
         }
         .gesture(dragGesture)
         .onHover { inside in
-            if inside, model.tool != .select { NSCursor.crosshair.set() } else { NSCursor.arrow.set() }
+            if inside, model.tool == .text { NSCursor.iBeam.set() }
+            else if inside, model.tool != .select { NSCursor.crosshair.set() } else { NSCursor.arrow.set() }
         }
-        .help(model.tool == .select ? "Drag the image into any app, or click an annotation to edit it" : "")
+        .help(model.tool == .select ? "Drag the image into any app, click an annotation to select it, double-click text to edit" : "")
         .onChange(of: model.tool) { _, tool in
+            model.commitText()
             if tool != .select { model.selectedID = nil }
         }
     }
@@ -81,18 +92,35 @@ struct AnnotationOverlay: View {
     }
 
     private func begin(at point: CGPoint) {
+        // Clicking anywhere while typing a label finishes it.
+        if model.textEditing != nil {
+            model.commitText()
+            dragging = .placing(point)   // swallow this click
+            draft = nil
+            return
+        }
         if let kind = model.tool.kind {
+            if kind.isPlaced {
+                dragging = .placing(point)
+                return
+            }
             dragging = .drawing(start: point)
             draft = Annotation(kind: kind, start: point, end: point, color: model.annotationColor)
             return
         }
         // Select tool: grab whatever is under the pointer (10 view points of slack).
         if let hit = model.annotation(at: point, tolerance: 10 / scale) {
-            model.selectedID = hit.id
-            model.beginMove()
-            dragging = .moving(id: hit.id, last: point)
+            if hit.kind == .text, let last = lastClick, last.id == hit.id, Date().timeIntervalSince(last.time) < 0.4 {
+                lastClick = nil
+                model.editText(hit.id)
+                dragging = .placing(point)
+                return
+            }
+            lastClick = (hit.id, Date())
+            model.select(hit.id)
+            dragging = .moving(id: hit.id, last: point, began: false)
         } else {
-            model.selectedID = nil
+            model.select(nil)
             dragging = .idle
         }
     }
@@ -101,15 +129,24 @@ struct AnnotationOverlay: View {
         switch dragging {
         case .drawing:
             draft?.end = point
-        case .moving(let id, let last):
+        case .moving(let id, let last, let began):
+            guard point != last else { return }
+            if !began { model.beginMove() }
             model.move(id, by: CGVector(dx: point.x - last.x, dy: point.y - last.y))
-            dragging = .moving(id: id, last: point)
+            dragging = .moving(id: id, last: point, began: true)
         default:
             break
         }
     }
 
     private func finish(viewDistance: CGFloat) {
+        if case .placing(let point) = dragging, viewDistance < 6, model.textEditing == nil {
+            switch model.tool {
+            case .step: model.placeStep(at: point)
+            case .text: model.beginText(at: point)
+            default: break
+            }
+        }
         if case .drawing = dragging, let draft {
             // Ignore clicks and tiny accidental drags.
             let big = draft.kind == .arrow ? viewDistance > 8 : (draft.rect.width * scale > 6 && draft.rect.height * scale > 6)
@@ -157,6 +194,8 @@ private struct DraftShape: View {
                 .fill(Color(white: 0.07))
                 .frame(width: rect.width, height: rect.height)
                 .offset(x: rect.minX, y: rect.minY)
+        case .text, .step:
+            EmptyView()
         }
     }
 
@@ -173,11 +212,19 @@ private struct SelectionOutline: View {
     let scale: CGFloat
 
     var body: some View {
-        let a = view(annotation.start)
-        let b = view(annotation.end)
         let pad: CGFloat = 6
-        let rect = CGRect(x: min(a.x, b.x) - pad, y: min(a.y, b.y) - pad,
+        let rect: CGRect = {
+            if annotation.kind.isPlaced {
+                let frame = annotation.frame(unit: model.annotationUnit)
+                let origin = view(frame.origin)
+                return CGRect(x: origin.x - pad, y: origin.y - pad,
+                              width: frame.width * scale + pad * 2, height: frame.height * scale + pad * 2)
+            }
+            let a = view(annotation.start)
+            let b = view(annotation.end)
+            return CGRect(x: min(a.x, b.x) - pad, y: min(a.y, b.y) - pad,
                           width: abs(b.x - a.x) + pad * 2, height: abs(b.y - a.y) + pad * 2)
+        }()
         RoundedRectangle(cornerRadius: 5)
             .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
             .frame(width: rect.width, height: rect.height)
@@ -197,9 +244,16 @@ struct AnnotationToolbar: View {
 
     /// Colours only matter for arrows and boxes.
     private var showsColors: Bool {
-        if model.tool == .arrow || model.tool == .box { return true }
+        if let kind = model.tool.kind, kind.usesColor { return true }
         guard let id = model.selectedID, let selected = model.annotations.first(where: { $0.id == id }) else { return false }
         return selected.kind.usesColor
+    }
+
+    /// Size only matters for text labels and steps.
+    private var showsSize: Bool {
+        if model.tool == .text || model.tool == .step { return true }
+        guard let id = model.selectedID, let selected = model.annotations.first(where: { $0.id == id }) else { return false }
+        return selected.kind.isPlaced
     }
 
     var body: some View {
@@ -217,7 +271,7 @@ struct AnnotationToolbar: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .keyboardShortcut(KeyEquivalent(tool.key), modifiers: [])
+                .keyboardShortcut(model.isTyping ? nil : KeyboardShortcut(KeyEquivalent(tool.key), modifiers: []))
                 .help("\(tool.title) (\(String(tool.key).uppercased()))")
                 .accessibilityLabel(tool.title)
             }
@@ -225,7 +279,7 @@ struct AnnotationToolbar: View {
             if showsColors {
             Divider().frame(height: 18).padding(.horizontal, 4)
 
-            ForEach(Annotation.palette, id: \.self) { color in
+            ForEach(Array((Preferences.shared.brandKit.colors.prefix(3) + Annotation.palette).uniqued().prefix(10)), id: \.self) { color in
                 Button {
                     model.annotationColor = color
                 } label: {
@@ -238,8 +292,25 @@ struct AnnotationToolbar: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .help("Arrow and box colour")
+                .help("Annotation colour")
             }
+            }
+
+            if showsSize {
+                Divider().frame(height: 18).padding(.horizontal, 4)
+                ForEach(Array(zip(["S", "M", "L"], Annotation.textSizes)), id: \.1) { label, size in
+                    Button { model.textSize = size } label: {
+                        Text(label)
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(width: 22, height: 22)
+                            .background(RoundedRectangle(cornerRadius: 5)
+                                .fill(model.textSize == size ? Color.accentColor.opacity(0.9) : .clear))
+                            .foregroundStyle(model.textSize == size ? Color.white : Color.primary)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Text and step size")
+                }
             }
 
             Divider().frame(height: 18).padding(.horizontal, 4)
@@ -313,5 +384,48 @@ enum DragOut {
                                      width: size.width, height: size.height),
                               contents: NSImage(cgImage: image, size: size))
         view.beginDraggingSession(with: [item], event: event, source: source)
+    }
+}
+
+/// The field for typing a text label, drawn where the label will go. Return places it, Esc cancels.
+private struct TextLabelEditor: View {
+    @ObservedObject var model: EditorModel
+    let scale: CGFloat
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        if let editing = model.textEditing {
+            let canvas = model.canvasPoint(fromSource: editing.point)
+            let font = max(CGFloat(model.textSize) * model.annotationUnit * scale, 11)
+            let color = model.annotationColor
+            TextField("Type a label", text: Binding(get: { model.textEditing?.text ?? "" },
+                                                    set: { model.textEditing?.text = $0 }),
+                      axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.system(size: font, weight: .semibold))
+                .foregroundStyle(color.isLight ? Color.black : Color.white)
+                .padding(.horizontal, font * 0.5)
+                .padding(.vertical, font * 0.32)
+                .fixedSize()
+                .frame(minWidth: font * 4, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: font * 0.45).fill(color.swiftUIColor))
+                .overlay(RoundedRectangle(cornerRadius: font * 0.45)
+                    .strokeBorder(Color.white.opacity(0.9), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3])))
+                .offset(x: canvas.x * scale, y: canvas.y * scale)
+                .focused($focused)
+                .onSubmit { model.commitText() }
+                .onExitCommand { model.cancelText() }
+                .onAppear { focused = true }
+                .onChange(of: focused) { _, isFocused in model.isTyping = isFocused }
+                .onDisappear { model.isTyping = false }
+        }
+    }
+}
+
+extension Sequence where Element: Hashable {
+    /// The elements in order, without repeats.
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }

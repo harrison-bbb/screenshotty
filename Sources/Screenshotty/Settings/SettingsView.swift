@@ -36,6 +36,41 @@ struct SettingsView: View {
                 }
             }
 
+            Section {
+                BrandKitEditor(kit: $prefs.brandKit)
+            } header: {
+                Text("Brand kit")
+            } footer: {
+                Text("Used for watermarks, and offered first as background and annotation colours.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Shared folder") {
+                    HStack {
+                        Text(prefs.teamStylesFolder.map { $0.path.replacingOccurrences(of: NSHomeDirectory(), with: "~") } ?? "None")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(.secondary)
+                        if prefs.teamStylesFolder != nil {
+                            Button("Remove") { prefs.teamStylesFolder = nil }
+                        }
+                        Button("Choose…", action: chooseTeamFolder)
+                    }
+                }
+                if prefs.teamStylesFolder != nil {
+                    Text("\(prefs.teamStyles.count) team style\(prefs.teamStyles.count == 1 ? "" : "s")")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Team styles")
+            } footer: {
+                Text("Pick a folder your team shares (Google Drive, iCloud, Dropbox or a git repo). Styles in it appear for everyone; right-click a style and choose Share with Team to add one.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("System") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
@@ -75,6 +110,17 @@ struct SettingsView: View {
         }
     }
 
+    private func chooseTeamFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.message = "Choose the folder your team shares styles in"
+        if panel.runModal() == .OK, let url = panel.url {
+            prefs.teamStylesFolder = url
+        }
+    }
+
     private func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -105,5 +151,57 @@ struct SettingsView: View {
 extension Bundle {
     var shortVersion: String {
         object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    }
+}
+
+/// Logo, name and colours for the team.
+struct BrandKitEditor: View {
+    @Binding var kit: BrandKit
+
+    var body: some View {
+        LabeledContent("Logo") {
+            HStack(spacing: 8) {
+                if let path = kit.logoPath, let image = NSImage(contentsOfFile: path) {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 26)
+                    Button("Remove") { kit.logoPath = nil }
+                }
+                Button(kit.logoPath == nil ? "Choose…" : "Change…", action: chooseLogo)
+            }
+        }
+        TextField("Name or handle", text: $kit.name, prompt: Text("e.g. acme.com or @acme"))
+        LabeledContent("Colours") {
+            HStack(spacing: 6) {
+                ForEach(kit.colors.indices, id: \.self) { index in
+                    ColorPicker("", selection: Binding(get: { kit.colors[index].swiftUIColor },
+                                                       set: { kit.colors[index] = RGBAColor($0) }),
+                                supportsOpacity: false)
+                        .labelsHidden()
+                        .contextMenu {
+                            Button("Remove") { kit.colors.remove(at: index) }
+                        }
+                }
+                if kit.colors.count < 8 {
+                    Button {
+                        kit.colors.append(kit.colors.last ?? RGBAColor(hex: "#4F46E5")!)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .help("Add a brand colour. Right-click a colour to remove it.")
+                }
+            }
+        }
+    }
+
+    private func chooseLogo() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .tiff, .heic, .pdf]
+        panel.message = "Choose your logo. A PNG with a transparent background looks best."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let destination = BrandKit.folder.appendingPathComponent("logo-\(UUID().uuidString.prefix(8))")
+            .appendingPathExtension(url.pathExtension.isEmpty ? "png" : url.pathExtension)
+        kit.logoPath = (try? FileManager.default.copyItem(at: url, to: destination)) != nil ? destination.path : url.path
     }
 }

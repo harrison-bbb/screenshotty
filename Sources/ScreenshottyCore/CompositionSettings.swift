@@ -172,6 +172,8 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
     public var device: DeviceStyle
     /// Exact width of the exported image in pixels. Nil exports at the screenshot's own resolution.
     public var exportWidth: Int?
+    /// A logo and/or text in a corner of the canvas.
+    public var watermark: Watermark?
 
     public init(background: BackgroundStyle = Presets.defaultBackground,
                 aspectRatio: AspectRatio = .auto,
@@ -185,7 +187,8 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
                 smartBackground: SmartBackground.Variant? = .vibrant,
                 browserURL: String = "",
                 device: DeviceStyle = .none,
-                exportWidth: Int? = nil) {
+                exportWidth: Int? = nil,
+                watermark: Watermark? = nil) {
         self.background = background
         self.aspectRatio = aspectRatio
         self.padding = padding
@@ -199,6 +202,7 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         self.browserURL = browserURL
         self.device = device
         self.exportWidth = exportWidth
+        self.watermark = watermark
     }
 
     /// These settings with the background resolved for `image` when a smart background is chosen.
@@ -241,7 +245,7 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
     // Tolerant decoding: missing keys fall back to defaults so old saved settings keep working.
     private enum CodingKeys: String, CodingKey {
         case background, aspectRatio, padding, cornerRadius, shadow, windowChrome, frame, autoTrim, innerPadding
-        case smartBackground, browserURL, device, exportWidth
+        case smartBackground, browserURL, device, exportWidth, watermark
     }
 
     public init(from decoder: Decoder) throws {
@@ -260,5 +264,6 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         browserURL = (try? c.decode(String.self, forKey: .browserURL)) ?? d.browserURL
         device = (try? c.decode(DeviceStyle.self, forKey: .device)) ?? d.device
         exportWidth = try? c.decode(Int.self, forKey: .exportWidth)
+        watermark = try? c.decode(Watermark.self, forKey: .watermark)
     }
 }

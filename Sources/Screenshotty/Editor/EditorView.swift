@@ -145,6 +145,9 @@ private struct ActionBar: View {
             Spacer(minLength: 8)
             Menu {
                 Button("Save As…", action: actions.saveAs)
+                Divider()
+                Button("Save Project…", action: actions.saveProject)
+                    .help("A .screenshotty file that reopens with the crop, annotations and style still editable")
             } label: {
                 Label("Save", systemImage: "square.and.arrow.down")
             } primaryAction: {

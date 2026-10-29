@@ -85,3 +85,36 @@ enum TempFile {
     }
     static func delete(_ url: URL) { try? FileManager.default.removeItem(at: url) }
 }
+
+/// Foundation-based helpers for the document tests.
+enum Docs {
+    static func tempFolder() -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("screenshotty-tests-" + UUID().uuidString)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    static func styleRoundTrip(_ style: Style, unpackInto folder: URL) throws -> Style {
+        let data = try StyleDocument(style: style).encoded()
+        return try StyleDocument.decode(data).style(unpackingInto: folder)
+    }
+
+    static func projectRoundTrip(_ project: ProjectDocument) throws -> ProjectDocument {
+        try ProjectDocument.decode(project.encoded())
+    }
+
+    static func sameContents(_ a: String, _ b: String) -> Bool {
+        FileManager.default.contentsEqual(atPath: a, andPath: b)
+    }
+
+    static func exists(_ path: String) -> Bool { FileManager.default.fileExists(atPath: path) }
+
+    static func decodeAnnotation(_ json: String) throws -> Annotation {
+        try JSONDecoder().decode(Annotation.self, from: Data(json.utf8))
+    }
+
+    static func styleFileIsJSON(_ style: Style) throws -> Bool {
+        let data = try StyleDocument(style: style).encoded()
+        return (try? JSONSerialization.jsonObject(with: data)) != nil
+    }
+}

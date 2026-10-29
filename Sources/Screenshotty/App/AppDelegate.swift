@@ -59,12 +59,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return true
     }
 
+    /// Images open in the editor, `.screenshotty` projects reopen editable, style files are added to My Styles.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
-            if let image = ImageLoader.load(url) {
-                WindowManager.shared.openEditor(with: image)
+            switch url.pathExtension.lowercased() {
+            case ProjectDocument.fileExtension:
+                do { try WindowManager.shared.openProject(url) } catch { showOpenError(error, url: url) }
+            case StyleDocument.fileExtension:
+                do {
+                    let style = try prefs.importStyle(from: url)
+                    Toast.show("Added the style \(style.name)")
+                } catch {
+                    showOpenError(error, url: url)
+                }
+            default:
+                if let image = ImageLoader.load(url) {
+                    WindowManager.shared.openEditor(with: image)
+                }
             }
         }
+    }
+
+    private func showOpenError(_ error: Error, url: URL) {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Couldn't open \(url.lastPathComponent)"
+        alert.informativeText = "The file may be damaged or from a newer version of Screenshotty. (\(error.localizedDescription))"
+        alert.runModal()
+    }
+
+    @objc func importStyle() {
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.screenshottyStyle]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose .screenshotty-style files to add to My Styles"
+        guard panel.runModal() == .OK else { return }
+        application(NSApp, open: panel.urls)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -131,7 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func openImage() {
         NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
+        panel.allowedContentTypes = [.image, .screenshottyProject, .screenshottyStyle]
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
         application(NSApp, open: panel.urls)

@@ -255,5 +255,5 @@ enum DeviceFrame {
 
 extension RGBAColor {
     /// True for colours where black text reads better than white.
-    var isLight: Bool { 0.2126 * red + 0.7152 * green + 0.0722 * blue > 0.6 }
+    public var isLight: Bool { 0.2126 * red + 0.7152 * green + 0.0722 * blue > 0.6 }
 }

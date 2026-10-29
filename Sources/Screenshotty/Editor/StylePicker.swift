@@ -1,6 +1,7 @@
 import AppKit
 import ScreenshottyCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// One-click looks, shown as cards that preview this screenshot in each style.
 struct StylePicker: View {
@@ -18,14 +19,7 @@ struct StylePicker: View {
                             model.apply(style)
                         }
                         .id(style.id)
-                        .contextMenu {
-                            if !style.isBuiltIn {
-                                Button("Update to Current Look") { update(style) }
-                                Button("Rename…") { rename(style) }
-                                Divider()
-                                Button("Delete", role: .destructive) { prefs.savedStyles.removeAll { $0.id == style.id } }
-                            }
-                        }
+                        .contextMenu { menu(for: style) }
                     }
                     SaveStyleCard(enabled: active == nil, action: save)
                 }
@@ -34,6 +28,57 @@ struct StylePicker: View {
             }
             .padding(.horizontal, -16)
             .onAppear { if let active { proxy.scrollTo(active, anchor: .center) } }
+        }
+    }
+
+    @ViewBuilder
+    private func menu(for style: Style) -> some View {
+        if style.isTeam {
+            Button("Duplicate to My Styles") { duplicate(style) }
+            if let folder = prefs.teamStylesFolder {
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([folder.appendingPathComponent(Preferences.fileName(for: style))]) }
+            }
+        } else if !style.isBuiltIn {
+            Button("Update to Current Look") { update(style) }
+            Button("Rename…") { rename(style) }
+        } else {
+            Button("Duplicate to My Styles") { duplicate(style) }
+        }
+        Divider()
+        Button("Export Style…") { export(style) }
+        if prefs.teamStylesFolder != nil, !style.isTeam {
+            Button("Share with Team") { share(style) }
+        }
+        if !style.isBuiltIn, !style.isTeam {
+            Divider()
+            Button("Delete", role: .destructive) { prefs.savedStyles.removeAll { $0.id == style.id } }
+        }
+    }
+
+    private func duplicate(_ style: Style) {
+        prefs.savedStyles.append(Style(name: style.name + " copy", settings: style.settings))
+    }
+
+    private func export(_ style: Style) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = Preferences.fileName(for: style)
+        panel.allowedContentTypes = [.screenshottyStyle]
+        panel.message = "Anyone with Screenshotty can open this file to add the style."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try StyleDocument(style: style).encoded().write(to: url)
+            Toast.show("Exported \(style.name)")
+        } catch {
+            NSAlert(error: error).runModal()
+        }
+    }
+
+    private func share(_ style: Style) {
+        do {
+            try prefs.shareWithTeam(style)
+            Toast.show("Shared \(style.name) with your team")
+        } catch {
+            NSAlert(error: error).runModal()
         }
     }
 
@@ -96,6 +141,17 @@ private struct StyleCard: View {
                     }
                 }
                 .frame(width: 112, height: 70)
+                .overlay(alignment: .topLeading) {
+                    if style.isTeam {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(4)
+                            .background(Color.accentColor, in: Circle())
+                            .padding(5)
+                            .help("Team style, from your shared folder")
+                    }
+                }
                 .overlay(alignment: .topTrailing) {
                     if selected {
                         Image(systemName: "checkmark.circle.fill")

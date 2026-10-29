@@ -81,6 +81,9 @@ public enum Compositor {
             drawFrame(settings.frame, layout: layout, in: ctx)
             drawCard(source, settings: settings, layout: layout, in: ctx, shadow: settings.shadow)
         }
+        if let watermark = settings.watermark {
+            WatermarkRenderer.draw(watermark, layout: layout, in: ctx)
+        }
 
         guard let image = ctx.makeImage() else { throw CompositorError.contextCreationFailed }
         return image
@@ -90,9 +93,9 @@ public enum Compositor {
     /// - Parameter minimumLongSide: When set, small results are upscaled by a whole factor so the
     ///   longest side reaches at least this many pixels (see `ExportScale`).
     public static func compose(_ source: CGImage, settings: CompositionSettings, annotations: [Annotation] = [],
-                               scale: CGFloat = 1, minimumLongSide: CGFloat? = nil) throws -> CGImage {
+                               crop: CGRect? = nil, scale: CGFloat = 1, minimumLongSide: CGFloat? = nil) throws -> CGImage {
         let settings = settings.resolved(for: source)
-        let prepared = ShotPreparer.prepareShot(source, settings: settings)
+        let prepared = ShotPreparer.prepareShot(source, crop: crop, settings: settings)
         if scale == 1 {
             return try renderExport(prepared, annotations: annotations, settings: settings, minimumLongSide: minimumLongSide)
         }

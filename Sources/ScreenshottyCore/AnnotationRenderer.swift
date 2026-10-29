@@ -34,10 +34,15 @@ public enum AnnotationRenderer {
                 drawRedaction(in: rect, ctx: ctx, unit: unit)
             }
         }
+        var stepNumber = 0
         for annotation in placed {
             switch annotation.kind {
             case .arrow: drawArrow(annotation, ctx: ctx, unit: unit)
             case .box: drawBox(annotation, ctx: ctx, unit: unit)
+            case .text: drawText(annotation, ctx: ctx, unit: unit)
+            case .step:
+                stepNumber += 1
+                drawStep(annotation, number: stepNumber, ctx: ctx, unit: unit)
             case .blur, .redact: break
             }
         }
@@ -104,6 +109,44 @@ public enum AnnotationRenderer {
         ctx.drawPath(using: .fillStroke)
         ctx.endTransparencyLayer()
         ctx.restoreGState()
+    }
+
+    /// White text on the colour (black on light colours), on a rounded pill so it reads anywhere.
+    private static func drawText(_ annotation: Annotation, ctx: CGContext, unit: CGFloat) {
+        guard !annotation.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let frame = annotation.frame(unit: unit)
+        let font = annotation.fontSize(unit: unit)
+        let ink = annotation.color.isLight ? RGBAColor(hex: "#111111")! : .white
+        ctx.saveGState()
+        setShadow(ctx, unit: unit)
+        let radius = min(font * 0.45, frame.height / 2)
+        ctx.addPath(CGPath(roundedRect: frame, cornerWidth: radius, cornerHeight: radius, transform: nil))
+        ctx.setFillColor(annotation.color.cgColor)
+        ctx.fillPath()
+        ctx.restoreGState()
+        let lineHeight = font * 1.25
+        let top = frame.minY + font * 0.32
+        for (i, text) in Annotation.lines(of: annotation.text).enumerated() {
+            TextLine(text, size: font, color: ink, weight: 0.3)
+                .draw(in: ctx, x: frame.minX + font * 0.5, centerY: top + lineHeight * (CGFloat(i) + 0.5), maxWidth: .greatestFiniteMagnitude)
+        }
+    }
+
+    /// A filled circle with a white ring and the step number.
+    private static func drawStep(_ annotation: Annotation, number: Int, ctx: CGContext, unit: CGFloat) {
+        let frame = annotation.frame(unit: unit)
+        let ring = max(frame.width * 0.07, 1)
+        ctx.saveGState()
+        setShadow(ctx, unit: unit)
+        ctx.setFillColor(RGBAColor.white.cgColor)
+        ctx.fillEllipse(in: frame)
+        ctx.restoreGState()
+        ctx.setFillColor(annotation.color.cgColor)
+        ctx.fillEllipse(in: frame.insetBy(dx: ring, dy: ring))
+        let ink = annotation.color.isLight ? RGBAColor(hex: "#111111")! : .white
+        let digits = "\(number)"
+        let line = TextLine(digits, size: annotation.fontSize(unit: unit) * (digits.count > 1 ? 0.8 : 0.95), color: ink, weight: 0.5)
+        line.draw(in: ctx, x: frame.midX - line.width / 2, centerY: frame.midY, maxWidth: frame.width)
     }
 
     private static func drawRedaction(in rect: CGRect, ctx: CGContext, unit: CGFloat) {

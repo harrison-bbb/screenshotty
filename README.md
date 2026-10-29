@@ -21,6 +21,9 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 ## Features
 
 - **Capture with one shortcut.** Press <kbd>⌘</kbd><kbd>⇧</kbd><kbd>2</kbd> and select an area. Press <kbd>Space</kbd> to pick a window. It is the same picker as the built-in screenshot tool.
+- **Built for teams.** A brand kit (logo, name, colours) puts a watermark on every image. Share any style as a
+  `.screenshotty-style` file, or point everyone at a shared folder of team styles. Save `.screenshotty` projects
+  that reopen with the crop, annotations and style still editable, so docs screenshots are easy to update.
 - **Never leak a secret.** Emails, API keys, tokens, card and phone numbers and IP addresses are found on your Mac (nothing is uploaded) and hidden in one click, with a solid bar or blur. Turn on Auto-hide once and every later capture is covered automatically.
 - **Styles.** Preview cards show your screenshot in each look: one-click looks for X, LinkedIn, Instagram, product launches, mobile apps, MacBook shots and docs, each with an exact export size. Save your own look as a style. Batch Export applies a style to a whole folder of screenshots.
 - **Browser frames and device mockups.** A Safari-style window with your URL in the address bar, or a MacBook or iPhone with their real screen shapes. Screen-shaped shots fill the display; a window sits on a Mac desktop; wide shots turn the iPhone landscape, and other tall shots get an iOS status bar. Combine them, like a browser on a MacBook.
@@ -32,7 +35,7 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 - **Backgrounds.** 16 gradients, 8 mesh wallpapers, solid colours, your own image or desktop wallpaper (with blur), or transparent. Images you've used stay under Recent, one click away.
 - **Social-ready sizes.** Auto (follows the shot, but very wide or tall shots get extra padding so they never post as a thin strip), 1:1, 4:5, 4:3, 3:2, 16:9, 1.91:1 (LinkedIn and Open Graph) and 9:16.
 - **Styling.** Rounded corners, soft to strong shadows, macOS window chrome in light or dark, and a hairline or frosted-glass frame.
-- **Annotations.** Arrows, highlight boxes, blur and redact, drawn straight on the preview. They stick to your content even when you change the trim, size or background. Redact covers the area with a solid bar, so use it for anything secret.
+- **Annotations.** Arrows, highlight boxes, text labels, numbered steps, blur and redact, drawn straight on the preview. They stick to your content even when you change the trim, size or background. Redact covers the area with a solid bar, so use it for anything secret.
 - **Fast export.** <kbd>⌘</kbd><kbd>C</kbd> to copy, <kbd>⌘</kbd><kbd>S</kbd> to save, or drag the preview straight into Slack, X, Figma or Finder. <kbd>⌘</kbd><kbd>Z</kbd> undoes style changes as well as annotations.
 - **Sharp on every network.** Small captures are enlarged pixel-for-pixel on export, so text stays crisp after X, LinkedIn or Slack resize them.
 - **Instant mode.** Optionally skip the preview and copy or save with your last style right after capturing.
@@ -100,7 +103,9 @@ Diagnostics are written to `~/Library/Logs/Screenshotty.log`. Please attach it w
 | Save as | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>S</kbd> |
 | Replace screenshot from clipboard | <kbd>⌘</kbd><kbd>V</kbd> |
 | New capture (while the editor is open) | <kbd>⌘</kbd><kbd>N</kbd> |
-| Select, Arrow, Box, Blur, Redact | <kbd>V</kbd> <kbd>A</kbd> <kbd>B</kbd> <kbd>U</kbd> <kbd>R</kbd> |
+| Select, Arrow, Box, Text, Step, Blur, Redact | <kbd>V</kbd> <kbd>A</kbd> <kbd>B</kbd> <kbd>T</kbd> <kbd>N</kbd> <kbd>U</kbd> <kbd>R</kbd> |
+| Edit a text label | Double-click it with Select |
+| Save project (re-editable) | <kbd>⌥</kbd><kbd>⌘</kbd><kbd>S</kbd> |
 | Crop | <kbd>C</kbd>, then <kbd>Return</kbd> to apply or <kbd>Esc</kbd> to cancel |
 | Undo / redo (style, crop and annotations) | <kbd>⌘</kbd><kbd>Z</kbd> / <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd> |
 | Delete selected annotation | <kbd>⌫</kbd> |
@@ -117,6 +122,8 @@ screenshotty render shot.png -o pretty.png --preset tahoe --aspect 16:9 --chrome
 screenshotty render shot.png --smart mesh
 screenshotty render shot.png --style launch --url yourapp.com --redact
 screenshotty render phone.png --device iphone --aspect 4:5 --width 1080
+screenshotty render guide.screenshotty -o guide.png          # a saved project, with its annotations
+screenshotty render shot.png --style-file "Acme launch.screenshotty-style" --logo logo.png --watermark acme.com
 screenshotty render --help
 ```
 
@@ -137,7 +144,7 @@ Run the tests with `scripts/test.sh`. See [CONTRIBUTING.md](CONTRIBUTING.md) for
 
 - Capture history with search by the text inside each screenshot
 - Copy text from a screenshot (on-device OCR)
-- Text labels, numbered steps, spotlight and magnifier annotations
+- Spotlight and magnifier annotations
 - Self-timer, scrolling capture and "capture the same area again"
 - JPEG and WebP export that fits each platform's size limit
 - Windows version (the style format is documented in [docs/composition-format.md](docs/composition-format.md) so it can share presets)

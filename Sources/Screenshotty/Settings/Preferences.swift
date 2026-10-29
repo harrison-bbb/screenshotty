@@ -58,7 +58,93 @@ final class Preferences: ObservableObject {
         didSet { saveJSON(savedStyles, key: "savedStyles") }
     }
 
-    var allStyles: [Style] { Style.builtIn + savedStyles }
+    var allStyles: [Style] { Style.builtIn + teamStyles + savedStyles }
+
+    // MARK: Team styles
+
+    /// A shared folder (Google Drive, iCloud, Dropbox, a git checkout…) of `.screenshotty-style` files.
+    /// Everyone pointing at the same folder sees the same styles.
+    @Published var teamStylesFolder: URL? {
+        didSet {
+            defaults.set(teamStylesFolder?.path, forKey: "teamStylesFolder")
+            reloadTeamStyles()
+            watchTeamFolder()
+        }
+    }
+
+    /// Styles read from the team folder. Read-only here; duplicate one to change it.
+    @Published private(set) var teamStyles: [Style] = []
+    private var folderWatcher: DispatchSourceFileSystemObject?
+
+    func reloadTeamStyles() {
+        guard let folder = teamStylesFolder,
+              let files = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) else {
+            teamStyles = []
+            return
+        }
+        teamStyles = files
+            .filter { $0.pathExtension == StyleDocument.fileExtension }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            .compactMap { url in
+                guard let data = try? Data(contentsOf: url), let document = try? StyleDocument.decode(data) else { return nil }
+                var style = document.style(unpackingInto: Self.importedFolder)
+                style.id = "team." + url.deletingPathExtension().lastPathComponent
+                return style
+            }
+    }
+
+    private func watchTeamFolder() {
+        folderWatcher?.cancel()
+        folderWatcher = nil
+        guard let folder = teamStylesFolder else { return }
+        let fd = open(folder.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main)
+        source.setEventHandler { [weak self] in
+            MainActor.assumeIsolated { self?.reloadTeamStyles() }
+        }
+        source.setCancelHandler { close(fd) }
+        source.resume()
+        folderWatcher = source
+    }
+
+    /// The style file name for a style: its name, made safe for a file system.
+    static func fileName(for style: Style) -> String {
+        let cleaned = style.name.components(separatedBy: CharacterSet(charactersIn: "/:\\?%*|\"<>")).joined(separator: "-")
+        return (cleaned.isEmpty ? "Style" : cleaned) + "." + StyleDocument.fileExtension
+    }
+
+    /// Writes a style into the team folder so teammates get it.
+    func shareWithTeam(_ style: Style) throws {
+        guard let folder = teamStylesFolder else { return }
+        try StyleDocument(style: style).encoded().write(to: folder.appendingPathComponent(Self.fileName(for: style)))
+        reloadTeamStyles()
+    }
+
+    /// Adds a style from a `.screenshotty-style` file to My Styles. Returns it.
+    @discardableResult
+    func importStyle(from url: URL) throws -> Style {
+        let document = try StyleDocument.decode(Data(contentsOf: url))
+        var style = document.style(unpackingInto: Self.importedFolder)
+        style.id = UUID().uuidString
+        if let index = savedStyles.firstIndex(where: { $0.name == style.name }) {
+            savedStyles[index].settings = style.settings
+            return savedStyles[index]
+        }
+        savedStyles.append(style)
+        return style
+    }
+
+    /// Where images from imported styles and projects are kept.
+    nonisolated static var importedFolder: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return base.appendingPathComponent("Screenshotty/Imported", isDirectory: true)
+    }
+
+    /// The team's logo, name and colours: the source for watermarks and brand swatches.
+    @Published var brandKit: BrandKit {
+        didSet { saveJSON(brandKit, key: "brandKit") }
+    }
 
     /// Background images used before (paths inside Application Support), most recent first.
     @Published private(set) var recentBackgroundImages: [String] {
@@ -101,6 +187,8 @@ final class Preferences: ObservableObject {
         sensitiveHideKind = defaults.string(forKey: "sensitiveHideKind").flatMap(Annotation.Kind.init(rawValue:))
             .flatMap { $0 == .blur ? .blur : .redact } ?? .redact
         savedStyles = Self.loadJSON([Style].self, key: "savedStyles", defaults: defaults) ?? []
+        brandKit = Self.loadJSON(BrandKit.self, key: "brandKit", defaults: defaults) ?? BrandKit()
+        teamStylesFolder = defaults.string(forKey: "teamStylesFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }
         recentBackgroundImages = (defaults.stringArray(forKey: "recentBackgroundImages") ?? [])
             .filter { FileManager.default.fileExists(atPath: $0) }
         if let path = defaults.string(forKey: "saveFolder") {
@@ -109,6 +197,9 @@ final class Preferences: ObservableObject {
             saveFolder = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first
                 ?? URL(fileURLWithPath: NSHomeDirectory())
         }
+        // didSet doesn't run during init, so load the team folder here.
+        reloadTeamStyles()
+        watchTeamFolder()
     }
 
     private func saveJSON<T: Encodable>(_ value: T, key: String) {
@@ -124,6 +215,26 @@ final class Preferences: ObservableObject {
     static var backgroundsFolder: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let url = base.appendingPathComponent("Screenshotty/Backgrounds", isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+}
+
+/// Logo, name and colours used for watermarks, brand backgrounds and annotation colours.
+struct BrandKit: Codable, Equatable {
+    var logoPath: String?
+    var name: String = ""
+    var colors: [RGBAColor] = []
+
+    var isEmpty: Bool { logoPath == nil && name.trimmingCharacters(in: .whitespaces).isEmpty && colors.isEmpty }
+
+    /// A watermark made from the kit: logo and name when both are set.
+    var watermark: Watermark { Watermark(logoPath: logoPath, text: name) }
+
+    /// Folder for the logo copy, so the kit keeps working if the original file moves.
+    static var folder: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let url = base.appendingPathComponent("Screenshotty/Brand", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }

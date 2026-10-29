@@ -14,6 +14,8 @@ public struct Style: Codable, Hashable, Identifiable, Sendable {
     }
 
     public var isBuiltIn: Bool { id.hasPrefix("builtin.") }
+    /// Loaded from the team's shared styles folder.
+    public var isTeam: Bool { id.hasPrefix("team.") }
 
     public static let builtIn: [Style] = [
         Style(id: "builtin.x", name: "X post",
