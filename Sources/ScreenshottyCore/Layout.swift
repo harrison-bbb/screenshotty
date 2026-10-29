@@ -38,6 +38,15 @@ public struct CompositionLayout: Equatable, Sendable {
             } else {
                 canvasH = canvasW / CGFloat(ratio)
             }
+        } else {
+            // Auto: follow the shot, but never as a thin strip. Very wide or tall shots get extra
+            // padding so the result still reads well in a feed.
+            let range = AspectRatio.autoRange
+            if canvasW / canvasH > CGFloat(range.upperBound) {
+                canvasH = canvasW / CGFloat(range.upperBound)
+            } else if canvasW / canvasH < CGFloat(range.lowerBound) {
+                canvasW = canvasH * CGFloat(range.lowerBound)
+            }
         }
 
         // Round up so the leftover space on each side is a whole pixel: the card is centred exactly.

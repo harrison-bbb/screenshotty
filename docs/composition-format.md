@@ -53,13 +53,16 @@ Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
 
 ## Layout rules
 
-1. If `autoTrim` is on, look for a plain background. The candidate is the most common colour along the image edges. It counts as the background when it covers at least 70% of all edge pixels and at least 30% of each of the four edges, within a per-channel tolerance of 2. A transparent candidate means a window capture.
-2. Remove rows and columns at the edges that are entirely background.
-3. If the background is a colour (not transparent), add an even inner margin of that colour around the content: `innerPadding` units, and never less than half the corner radius, so rounded corners cannot clip the content.
-4. The card is the screenshot plus a 28-unit title bar when `windowChrome` is not `none`. Traffic lights are 12 units wide, 20 units apart, with the first centred 20 units from the left, moved right only if needed to stay inside the rounded corner.
-5. The minimum canvas is the card plus `padding` on each side, plus a 14-unit frame when `frame` is `glass`.
-6. For a fixed aspect ratio, the canvas grows along one axis until it matches.
-7. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.
+1. If `autoTrim` is on, first cut thin foreign slivers off each edge (a few pixels of desktop or a neighbouring window caught by a sloppy selection). A side is a candidate when its outermost line covers less than half with the colour that frames the rest of the image. Within a depth of 2% of the image size (at least 6 px, at most 16 px), find the first line that is at least 92% one colour, followed by another such line, where the outermost line has less than 60% of that colour. Everything outside that line is cut.
+2. Then look for a plain background. The candidate is the most common colour along the image edges. It counts as the background when it covers at least 70% of all edge pixels and at least 30% of each of the four edges, within a per-channel tolerance of 2. A transparent candidate means a window capture.
+3. Remove rows and columns at the edges that are entirely background.
+4. If the background is a colour (not transparent), add an even inner margin of that colour around the content: `innerPadding` units, and never less than half the corner radius, so rounded corners cannot clip the content.
+5. The card is the screenshot plus a 28-unit title bar when `windowChrome` is not `none`. Traffic lights are 12 units wide, 20 units apart, with the first centred 20 units from the left, moved right only if needed to stay inside the rounded corner.
+6. The minimum canvas is the card plus `padding` on each side, plus a 14-unit frame when `frame` is `glass`.
+7. For a fixed aspect ratio, the canvas grows along one axis until it matches. With `auto`, it grows only if needed to keep the shape between 4:5 and 2:1.
+8. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.
+
+On export, a result whose longest side is under 1600 px may be enlarged by the smallest whole factor (up to 4) that reaches it. The shot is enlarged with nearest-neighbour sampling so pixels stay sharp, then annotations and the composition are drawn at the new size.
 
 Shadow parameters (blur, y-offset, opacity) are: soft (30, 8, 0.22), medium (50, 18, 0.35), strong (70, 28, 0.5).
 
@@ -67,7 +70,7 @@ Shadow parameters (blur, y-offset, opacity) are: soft (30, 8, 0.22), medium (50,
 
 1. Downscale the screenshot to at most 96 px on its longest side.
 2. Ignore pixels that are mostly transparent, have saturation below 0.25 or brightness below 0.25.
-3. Sort the rest into 36 hue bins, each pixel weighted by saturation² × brightness. Smooth each bin with half of each neighbour.
+3. Sort the rest into 36 hue bins, each pixel weighted by saturation × brightness, so the accent covering the most area wins. Smooth each bin with half of each neighbour.
 4. The primary hue is the strongest bin. The secondary is the strongest bin at least 40° away with at least 20% of the primary's weight, or primary + 35°. It is then pulled to within 60° of the primary so gradients never turn muddy.
 5. With almost no colourful pixels (fewer than 1 in 400), use hues 230° and 270° with saturation scaled by 0.35.
 

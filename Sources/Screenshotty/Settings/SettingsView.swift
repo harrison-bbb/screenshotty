@@ -16,6 +16,8 @@ struct SettingsView: View {
                 Picker("After capturing", selection: $prefs.afterCapture) {
                     ForEach(AfterCaptureAction.allCases) { Text($0.title).tag($0) }
                 }
+                Toggle("Sharpen small screenshots", isOn: $prefs.upscaleSmallShots)
+                    .help("Small captures are enlarged pixel-for-pixel on export, so they stay crisp after X, LinkedIn or Slack resize them")
                 LabeledContent("Save to") {
                     HStack {
                         Text(prefs.saveFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))

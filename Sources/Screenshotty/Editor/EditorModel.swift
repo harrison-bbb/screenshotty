@@ -96,6 +96,12 @@ final class EditorModel: ObservableObject {
     /// True when the screenshot sits on a plain background, so the inner margin applies.
     @Published private(set) var hasPlainBackground = false
 
+    /// True when slivers of desktop or another window were cut off the capture's edges.
+    @Published private(set) var cleanedEdges = false
+
+    /// While true the canvas shows the capture exactly as taken, for comparison.
+    @Published var showOriginal = false
+
     /// The screenshot after optional trimming and inner margin (without annotations).
     private(set) var prepared: PreparedShot
     private var analysis: ShotAnalysis?
@@ -124,7 +130,27 @@ final class EditorModel: ObservableObject {
         CompositionLayout(imageSize: CGSize(width: prepared.image.width, height: prepared.image.height), settings: settings)
     }
 
-    var outputSize: CGSize { layout.canvasSize }
+    /// Whole-number enlargement applied on export so small captures stay sharp.
+    var exportFactor: Int {
+        guard let minimum = Preferences.shared.exportMinimumLongSide else { return 1 }
+        return ExportScale.factor(for: layout.canvasSize, minimumLongSide: minimum)
+    }
+
+    var outputSize: CGSize {
+        let canvas = layout.canvasSize
+        let factor = CGFloat(exportFactor)
+        return CGSize(width: canvas.width * factor, height: canvas.height * factor)
+    }
+
+    /// Short descriptions of what was improved automatically, shown under the canvas.
+    var fixes: [String] {
+        var list: [String] = []
+        if cleanedEdges { list.append("Edges cleaned") }
+        if trimmedSomething { list.append(hasPlainBackground ? "Margins balanced" : "Margins trimmed") }
+        if settings.smartBackground != nil { list.append("Colours matched") }
+        if exportFactor > 1 { list.append("Sharpened \(exportFactor)×") }
+        return list
+    }
 
     var trimmedSomething: Bool {
         prepared.image.width != source.width || prepared.image.height != source.height
@@ -147,8 +173,8 @@ final class EditorModel: ObservableObject {
 
     /// Full-resolution output for export.
     func renderFull() throws -> CGImage {
-        let shot = AnnotationRenderer.apply(annotations, to: prepared.image, offset: prepared.offset)
-        return try Compositor.render(shot, settings: settings)
+        try Compositor.renderExport(prepared, annotations: annotations, settings: settings,
+                                    minimumLongSide: Preferences.shared.exportMinimumLongSide)
     }
 
     // MARK: Coordinate mapping (canvas pixels <-> original capture pixels)
@@ -231,6 +257,7 @@ final class EditorModel: ObservableObject {
         let analysis = self.analysis ?? ImageTrimmer.analyze(source)
         self.analysis = analysis
         hasPlainBackground = analysis.backgroundColor != nil
+        cleanedEdges = settings.autoTrim && analysis.cleanedEdges
         prepared = ShotPreparer.prepareShot(source, analysis: analysis, settings: settings)
         scheduleRender(debounce: false)
     }

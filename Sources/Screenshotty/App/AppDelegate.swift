@@ -171,14 +171,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func handleCaptured(_ image: CGImage) {
         switch prefs.afterCapture {
+        case .quickPreview:
+            QuickPreviewManager.shared.show(image)
         case .openEditor:
             WindowManager.shared.openEditor(with: image)
         case .copy:
-            guard let output = try? Compositor.compose(image, settings: prefs.lastSettings) else { return }
+            guard let output = try? Compositor.compose(image, settings: prefs.lastSettings,
+                                                       minimumLongSide: prefs.exportMinimumLongSide) else { return }
             Exporter.copyToPasteboard(output)
             Toast.show("Copied to clipboard")
         case .save:
-            guard let output = try? Compositor.compose(image, settings: prefs.lastSettings) else { return }
+            guard let output = try? Compositor.compose(image, settings: prefs.lastSettings,
+                                                       minimumLongSide: prefs.exportMinimumLongSide) else { return }
             do {
                 let url = try Exporter.save(output, in: prefs.saveFolder)
                 Toast.show("Saved to \(url.deletingLastPathComponent().lastPathComponent)")

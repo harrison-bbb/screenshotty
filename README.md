@@ -21,14 +21,17 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 ## Features
 
 - **Capture with one shortcut.** Press <kbd>⌘</kbd><kbd>⇧</kbd><kbd>2</kbd> and select an area. Press <kbd>Space</kbd> to pick a window. It is the same picker as the built-in screenshot tool.
+- **Quick preview.** After each capture a small card slides in at the bottom-left with the finished image. Copy, save, edit, or drag it straight into another app. It slides away on its own.
+- **Fixes sloppy captures.** Grabbed a few pixels of desktop or a neighbouring window? Those slivers are cut off automatically. Hold **Compare** in the editor to see the capture as it was taken.
 - **Auto-trim and balance.** Uneven plain margins are removed and replaced with an even inner margin in the screenshot's own background colour. Tight crops of text get breathing room, and rounded corners never clip your content. The result is centred to the pixel.
-- **Smart backgrounds.** Vibrant, mesh, pastel and dark looks generated from your screenshot's own colours. Pick one and every new capture gets its own matching background.
+- **Smart backgrounds, on by default.** Vibrant, mesh, pastel and dark looks generated from your screenshot's main accent colour. Every new capture gets its own matching background.
 - **Backgrounds.** 16 gradients, 8 mesh wallpapers, solid colours, your own image or desktop wallpaper (with blur), or transparent.
-- **Social-ready sizes.** Auto, 1:1, 4:5, 4:3, 3:2, 16:9, 1.91:1 (LinkedIn and Open Graph) and 9:16.
+- **Social-ready sizes.** Auto (follows the shot, but very wide or tall shots get extra padding so they never post as a thin strip), 1:1, 4:5, 4:3, 3:2, 16:9, 1.91:1 (LinkedIn and Open Graph) and 9:16.
 - **Styling.** Rounded corners, soft to strong shadows, macOS window chrome in light or dark, and a hairline or frosted-glass frame.
 - **Annotations.** Arrows, highlight boxes, blur and redact, drawn straight on the preview. They stick to your content even when you change the trim, size or background. Redact covers the area with a solid bar, so use it for anything secret.
 - **Fast export.** <kbd>⌘</kbd><kbd>C</kbd> to copy, <kbd>⌘</kbd><kbd>S</kbd> to save, or drag the image straight into Slack, X, Figma or Finder.
-- **Instant mode.** Optionally skip the editor and copy or save with your last style right after capturing.
+- **Sharp on every network.** Small captures are enlarged pixel-for-pixel on export, so text stays crisp after X, LinkedIn or Slack resize them.
+- **Instant mode.** Optionally skip the preview and copy or save with your last style right after capturing.
 - **Also works on existing images.** Open any image, paste from the clipboard, or drop a file onto the editor.
 - **Command line.** `Screenshotty render input.png --preset ocean --aspect 16:9` for scripts and automation.
 

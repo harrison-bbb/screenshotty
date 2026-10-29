@@ -11,6 +11,7 @@ enum CLI {
         var input: String?
         var output: String?
         var settings = CompositionSettings.default
+        var upscale = true
         var i = 0
 
         func value() -> String? {
@@ -32,10 +33,14 @@ enum CLI {
                     return fail("Unknown preset. Available: \(Presets.all.map(\.id).joined(separator: ", "))")
                 }
                 settings.background = preset.style
+                settings.smartBackground = nil
             case "--color":
                 guard let hex = value(), let color = RGBAColor(hex: hex) else { return fail("Invalid colour") }
                 settings.background = .solid(color)
-            case "--transparent": settings.background = .transparent
+                settings.smartBackground = nil
+            case "--transparent":
+                settings.background = .transparent
+                settings.smartBackground = nil
             case "--smart":
                 guard let v = value().flatMap(SmartBackground.Variant.init(rawValue:)) else {
                     return fail("Unknown smart style. Available: \(SmartBackground.Variant.allCases.map(\.rawValue).joined(separator: ", "))")
@@ -62,6 +67,7 @@ enum CLI {
                 guard let v = value().flatMap(FrameStyle.init(rawValue:)) else { return fail("Invalid frame") }
                 settings.frame = v
             case "--no-trim": settings.autoTrim = false
+            case "--no-upscale": upscale = false
             case "--inner":
                 guard let v = value().flatMap(Double.init) else { return fail("Invalid inner margin") }
                 settings.innerPadding = v
@@ -79,7 +85,8 @@ enum CLI {
         guard let image = ImageLoader.load(URL(fileURLWithPath: input)) else { return fail("Could not read \(input)") }
         let outPath = output ?? (input as NSString).deletingPathExtension + "-screenshotty.png"
         do {
-            let result = try Compositor.compose(image, settings: settings)
+            let result = try Compositor.compose(image, settings: settings,
+                                               minimumLongSide: upscale ? ExportScale.defaultMinimumLongSide : nil)
             try PNGEncoder.write(result, to: URL(fileURLWithPath: outPath))
             print("\(outPath) (\(result.width)×\(result.height))")
             return 0
@@ -99,7 +106,7 @@ enum CLI {
     Options:
       --preset <id>        Background preset (\(Presets.all.map(\.id).joined(separator: ", ")))
       --color <hex>        Solid background colour, e.g. #FFFFFF
-      --smart <style>      Background matched to the screenshot's colours: vibrant, mesh, pastel, dark
+      --smart <style>      Background matched to the screenshot's colours: vibrant (default), mesh, pastel, dark
       --transparent        No background
       --aspect <ratio>     \(AspectRatio.allCases.map(\.rawValue).joined(separator: ", "))
       --padding <units>    Padding, in 1/1000ths of the screenshot's longest side (default 90)
@@ -108,7 +115,8 @@ enum CLI {
       --chrome <style>     none, light, dark
       --frame <style>      none, hairline, glass
       --inner <units>      Even inner margin for screenshots on a plain background (default 40)
-      --no-trim            Keep the screenshot exactly as captured
+      --no-trim            Keep the screenshot exactly as captured (also keeps sloppy edges)
+      --no-upscale         Don't enlarge small results (by default they are doubled pixel-for-pixel up to 1600 px)
       --settings <file>    Load settings from a JSON file (see docs/composition-format.md)
     """
 }

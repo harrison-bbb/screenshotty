@@ -3,10 +3,11 @@ import Foundation
 import ScreenshottyCore
 
 enum AfterCaptureAction: String, CaseIterable, Identifiable {
-    case openEditor, copy, save
+    case quickPreview, openEditor, copy, save
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .quickPreview: "Show a quick preview"
         case .openEditor: "Open the editor"
         case .copy: "Copy to clipboard instantly"
         case .save: "Save to folder instantly"
@@ -35,6 +36,13 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(afterCapture.rawValue, forKey: "afterCapture") }
     }
 
+    /// Enlarge small results pixel-for-pixel on export so they stay sharp once posted.
+    @Published var upscaleSmallShots: Bool {
+        didSet { defaults.set(upscaleSmallShots, forKey: "upscaleSmallShots") }
+    }
+
+    var exportMinimumLongSide: CGFloat? { upscaleSmallShots ? ExportScale.defaultMinimumLongSide : nil }
+
     @Published var saveFolder: URL {
         didSet { defaults.set(saveFolder.path, forKey: "saveFolder") }
     }
@@ -51,7 +59,8 @@ final class Preferences: ObservableObject {
         } else {
             hotKey = Self.loadJSON(HotKey.self, key: "hotKey", defaults: defaults) ?? .default
         }
-        afterCapture = defaults.string(forKey: "afterCapture").flatMap(AfterCaptureAction.init(rawValue:)) ?? .openEditor
+        afterCapture = defaults.string(forKey: "afterCapture").flatMap(AfterCaptureAction.init(rawValue:)) ?? .quickPreview
+        upscaleSmallShots = defaults.object(forKey: "upscaleSmallShots") as? Bool ?? true
         if let path = defaults.string(forKey: "saveFolder") {
             saveFolder = URL(fileURLWithPath: path, isDirectory: true)
         } else {

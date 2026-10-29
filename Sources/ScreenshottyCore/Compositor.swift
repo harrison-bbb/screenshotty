@@ -39,12 +39,38 @@ public enum Compositor {
     }
 
     /// Prepares the shot (trim and even inner margin, if enabled), draws annotations and renders in one step.
+    /// - Parameter minimumLongSide: When set, small results are upscaled by a whole factor so the
+    ///   longest side reaches at least this many pixels (see `ExportScale`).
     public static func compose(_ source: CGImage, settings: CompositionSettings, annotations: [Annotation] = [],
-                               scale: CGFloat = 1) throws -> CGImage {
+                               scale: CGFloat = 1, minimumLongSide: CGFloat? = nil) throws -> CGImage {
         let settings = settings.resolved(for: source)
         let prepared = ShotPreparer.prepareShot(source, settings: settings)
+        if scale == 1 {
+            return try renderExport(prepared, annotations: annotations, settings: settings, minimumLongSide: minimumLongSide)
+        }
         let shot = AnnotationRenderer.apply(annotations, to: prepared.image, offset: prepared.offset)
         return try render(shot, settings: settings, scale: scale)
+    }
+
+    /// Full-resolution output. Small shots are first enlarged by a whole factor with nearest-neighbour
+    /// sampling, which keeps UI and text pixel-sharp, and annotations are drawn at the new size so
+    /// they stay smooth. The background, shadow and corners render natively at the larger size.
+    public static func renderExport(_ prepared: PreparedShot, annotations: [Annotation], settings: CompositionSettings,
+                                    minimumLongSide: CGFloat?) throws -> CGImage {
+        var shot = prepared
+        var marks = annotations
+        if let minimumLongSide {
+            let layout = CompositionLayout(imageSize: CGSize(width: prepared.image.width, height: prepared.image.height),
+                                           settings: settings)
+            let factor = ExportScale.factor(for: layout.canvasSize, minimumLongSide: minimumLongSide)
+            if factor > 1, let enlarged = ExportScale.enlarge(prepared.image, by: factor) {
+                let f = CGFloat(factor)
+                shot = PreparedShot(image: enlarged, offset: CGPoint(x: prepared.offset.x * f, y: prepared.offset.y * f))
+                marks = annotations.map { $0.scaled(by: f) }
+            }
+        }
+        let image = AnnotationRenderer.apply(marks, to: shot.image, offset: shot.offset)
+        return try render(image, settings: settings)
     }
 
     // MARK: - Pieces

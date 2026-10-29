@@ -9,9 +9,27 @@ public struct ShotAnalysis: Equatable, Sendable {
     public var backgroundColor: RGBAColor?
     /// True when the margins are transparent (e.g. a window capture).
     public var transparentMargins: Bool
+    /// True when thin slivers of something else (desktop, a neighbouring window) were cut off the edges.
+    public var cleanedEdges: Bool
+
+    public init(contentRect: CGRect, backgroundColor: RGBAColor?, transparentMargins: Bool, cleanedEdges: Bool = false) {
+        self.contentRect = contentRect
+        self.backgroundColor = backgroundColor
+        self.transparentMargins = transparentMargins
+        self.cleanedEdges = cleanedEdges
+    }
+}
+
+/// Pixel bounds with exclusive upper ends.
+struct PixelBounds: Equatable {
+    var x0: Int, y0: Int, x1: Int, y1: Int
+    var width: Int { x1 - x0 }
+    var height: Int { y1 - y0 }
+    var rect: CGRect { CGRect(x: x0, y: y0, width: width, height: height) }
 }
 
 /// Finds plain margins around a screenshot so the content can be trimmed, re-padded evenly and centred.
+/// Also repairs sloppy selections by cutting thin slivers of unrelated pixels off the edges.
 public enum ImageTrimmer {
     /// Share of all edge pixels that must be the background colour.
     static let edgeCoverageThreshold = 0.7
@@ -25,25 +43,30 @@ public enum ImageTrimmer {
     public static func analyze(_ image: CGImage, tolerance: Int = 2) -> ShotAnalysis {
         let width = image.width
         let height = image.height
-        let full = CGRect(x: 0, y: 0, width: width, height: height)
-        let none = ShotAnalysis(contentRect: full, backgroundColor: nil, transparentMargins: false)
-        guard width > 2, height > 2, let pixels = RGBABuffer(image: image) else { return none }
+        let full = PixelBounds(x0: 0, y0: 0, x1: width, y1: height)
+        guard width > 2, height > 2, let pixels = RGBABuffer(image: image) else {
+            return ShotAnalysis(contentRect: full.rect, backgroundColor: nil, transparentMargins: false)
+        }
+        let bounds = sliverFreeBounds(pixels)
+        var result = analyzeMargins(pixels, in: bounds, tolerance: tolerance)
+        result.cleanedEdges = bounds != full
+        return result
+    }
+
+    static func analyzeMargins(_ pixels: RGBABuffer, in b: PixelBounds, tolerance: Int) -> ShotAnalysis {
+        let none = ShotAnalysis(contentRect: b.rect, backgroundColor: nil, transparentMargins: false)
+        guard b.width > 2, b.height > 2 else { return none }
 
         // Edge pixels, one array per side.
         let edges: [[RGBAPixel]] = [
-            (0..<width).map { pixels[$0, 0] },
-            (0..<width).map { pixels[$0, height - 1] },
-            (0..<height).map { pixels[0, $0] },
-            (0..<height).map { pixels[width - 1, $0] },
+            (b.x0..<b.x1).map { pixels[$0, b.y0] },
+            (b.x0..<b.x1).map { pixels[$0, b.y1 - 1] },
+            (b.y0..<b.y1).map { pixels[b.x0, $0] },
+            (b.y0..<b.y1).map { pixels[b.x1 - 1, $0] },
         ]
 
         // The candidate background is the most common edge colour.
-        var counts: [UInt32: Int] = [:]
-        for edge in edges {
-            for p in edge { counts[p.key, default: 0] += 1 }
-        }
-        guard let dominantKey = counts.max(by: { $0.value < $1.value })?.key else { return none }
-        let dominant = RGBAPixel(key: dominantKey)
+        guard let dominant = dominantColor(edges.flatMap { $0 }) else { return none }
         let transparent = dominant.a < 8
 
         func isBackground(_ p: RGBAPixel) -> Bool {
@@ -62,19 +85,19 @@ public enum ImageTrimmer {
         guard Double(matched) / Double(total) >= edgeCoverageThreshold else { return none }
         let reference: RGBAPixel? = transparent ? nil : dominant
 
-        func rowIsMargin(_ y: Int) -> Bool { (0..<width).allSatisfy { matches($0, y) } }
+        func rowIsMargin(_ y: Int) -> Bool { (b.x0..<b.x1).allSatisfy { matches($0, y) } }
         func columnIsMargin(_ x: Int, _ yRange: Range<Int>) -> Bool { yRange.allSatisfy { matches(x, $0) } }
 
-        var top = 0
-        while top < height, rowIsMargin(top) { top += 1 }
-        guard top < height else { return none } // the whole image is one colour
-        var bottom = height - 1
+        var top = b.y0
+        while top < b.y1, rowIsMargin(top) { top += 1 }
+        guard top < b.y1 else { return none } // the whole image is one colour
+        var bottom = b.y1 - 1
         while bottom > top, rowIsMargin(bottom) { bottom -= 1 }
 
         let rows = top..<(bottom + 1)
-        var left = 0
-        while left < width, columnIsMargin(left, rows) { left += 1 }
-        var right = width - 1
+        var left = b.x0
+        while left < b.x1, columnIsMargin(left, rows) { left += 1 }
+        var right = b.x1 - 1
         while right > left, columnIsMargin(right, rows) { right -= 1 }
 
         let background = reference.map {
@@ -83,6 +106,73 @@ public enum ImageTrimmer {
         }
         return ShotAnalysis(contentRect: CGRect(x: left, y: top, width: right - left + 1, height: bottom - top + 1),
                             backgroundColor: background, transparentMargins: transparent)
+    }
+
+    // MARK: Sloppy edges
+
+    /// Deepest sliver that gets cut, as a share of the image size, and in pixels.
+    static let maxSliverShare = 0.02
+    static let maxSliverPixels = 16
+
+    private enum Side: CaseIterable { case top, bottom, left, right }
+
+    /// Bounds with thin foreign strips removed: e.g. 4 px of desktop caught by a sloppy drag next to a window.
+    ///
+    /// A strip is cut only when all of this holds, so real content is left alone:
+    /// - its outermost line does not match the colour that frames the rest of the image,
+    /// - within a few pixels it gives way to a clean, uniform line (the real background starts there),
+    /// - none of the lines being cut already has that background colour.
+    static func sliverFreeBounds(_ pixels: RGBABuffer) -> PixelBounds {
+        var b = PixelBounds(x0: 0, y0: 0, x1: pixels.width, y1: pixels.height)
+        guard pixels.width >= 40, pixels.height >= 40 else { return b }
+
+        func line(_ side: Side, _ depth: Int, in b: PixelBounds) -> [RGBAPixel] {
+            let step: (Int) -> Int = { length in max(1, length / 1500) }
+            switch side {
+            case .top: return stride(from: b.x0, to: b.x1, by: step(b.width)).map { pixels[$0, b.y0 + depth] }
+            case .bottom: return stride(from: b.x0, to: b.x1, by: step(b.width)).map { pixels[$0, b.y1 - 1 - depth] }
+            case .left: return stride(from: b.y0, to: b.y1, by: step(b.height)).map { pixels[b.x0 + depth, $0] }
+            case .right: return stride(from: b.y0, to: b.y1, by: step(b.height)).map { pixels[b.x1 - 1 - depth, $0] }
+            }
+        }
+
+        let outer = Side.allCases.map { line($0, 0, in: b) }
+        guard let frame = dominantColor(outer.flatMap { $0 }) else { return b }
+
+        for (index, side) in Side.allCases.enumerated() {
+            guard coverage(outer[index], of: frame) < 0.5 else { continue } // looks like the rest of the frame
+            let size = (side == .top || side == .bottom) ? b.height : b.width
+            let maxDepth = min(maxSliverPixels, max(6, Int(Double(size) * maxSliverShare)))
+            guard size > maxDepth * 4 else { continue }
+            for depth in 1...maxDepth {
+                let candidate = line(side, depth, in: b)
+                guard let color = dominantColor(candidate), coverage(candidate, of: color) >= 0.92,
+                      coverage(line(side, depth + 1, in: b), of: color) >= 0.9 else { continue }
+                // Still inside the sliver itself: keep looking deeper.
+                guard coverage(outer[index], of: color) < 0.6 else { continue }
+                // If a line before this one already has the background colour there is no sliver.
+                guard (1..<depth).allSatisfy({ coverage(line(side, $0, in: b), of: color) < 0.6 }) else { break }
+                switch side {
+                case .top: b.y0 += depth
+                case .bottom: b.y1 -= depth
+                case .left: b.x0 += depth
+                case .right: b.x1 -= depth
+                }
+                break
+            }
+        }
+        return b
+    }
+
+    static func dominantColor(_ pixels: [RGBAPixel]) -> RGBAPixel? {
+        var counts: [UInt32: Int] = [:]
+        for p in pixels { counts[p.key, default: 0] += 1 }
+        return counts.max(by: { $0.value < $1.value }).map { RGBAPixel(key: $0.key) }
+    }
+
+    static func coverage(_ pixels: [RGBAPixel], of color: RGBAPixel, tolerance: Int = 6) -> Double {
+        guard !pixels.isEmpty else { return 0 }
+        return Double(pixels.filter { $0.isClose(to: color, tolerance: tolerance) }.count) / Double(pixels.count)
     }
 
     /// The crop rect of the content inside plain margins (the full image if there are none).

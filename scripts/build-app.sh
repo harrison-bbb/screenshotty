@@ -31,6 +31,8 @@ fi
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 echo "==> Ad-hoc signing"
+# Extended attributes (e.g. Finder info) make codesign refuse to sign.
+xattr -cr "$APP"
 # Ad-hoc signatures normally identify the app by a hash of this exact build, so macOS forgets the
 # Screen Recording permission after every update. Pinning the designated requirement to the bundle
 # identifier keeps the permission across builds and releases.

@@ -38,8 +38,9 @@ public enum SmartBackground {
         let fallback = Palette(primaryHue: 0.64, secondaryHue: 0.75, isColorful: false)
         guard drawn else { return fallback }
 
-        // Weight hues by how colourful each pixel is. Greys, near-whites and near-blacks
-        // (most of any UI) carry almost no weight, so accent colours win.
+        // Weight hues by how colourful each pixel is (chroma). Greys, near-whites and near-blacks
+        // (most of any UI) carry almost no weight, so accent colours win. Linear weighting lets the
+        // accent that covers the most area win over one small, very loud element (e.g. a yellow button).
         let bins = 36
         var weights = [Double](repeating: 0, count: bins)
         var colorfulPixels = 0
@@ -52,7 +53,7 @@ public enum SmartBackground {
             guard sat > 0.25, bri > 0.25 else { continue }
             colorfulPixels += 1
             let bin = min(Int(hue * Double(bins)), bins - 1)
-            weights[bin] += sat * sat * bri
+            weights[bin] += sat * bri
         }
         guard counted > 0, colorfulPixels > max(counted / 400, 2),
               let top = weights.indices.max(by: { weights[$0] < weights[$1] }) else { return fallback }

@@ -14,6 +14,9 @@ public enum AspectRatio: String, Codable, CaseIterable, Identifiable, Sendable {
 
     public var id: String { rawValue }
 
+    /// Canvas shapes Auto stays within (width / height): from a 4:5 feed post to 2:1.
+    public static let autoRange: ClosedRange<Double> = 0.8...2.0
+
     /// width / height, or nil for "fit the screenshot".
     public var ratio: Double? {
         switch self {
@@ -43,7 +46,7 @@ public enum AspectRatio: String, Codable, CaseIterable, Identifiable, Sendable {
 
     public var subtitle: String {
         switch self {
-        case .auto: "Fit shot"
+        case .auto: "Fits the shot, never a thin strip"
         case .square: "Instagram"
         case .portrait: "Feed post"
         case .standard: "Slides"
@@ -117,7 +120,7 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
                 frame: FrameStyle = .none,
                 autoTrim: Bool = true,
                 innerPadding: Double = 40,
-                smartBackground: SmartBackground.Variant? = nil) {
+                smartBackground: SmartBackground.Variant? = .vibrant) {
         self.background = background
         self.aspectRatio = aspectRatio
         self.padding = padding

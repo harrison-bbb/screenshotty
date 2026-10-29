@@ -54,6 +54,13 @@ public struct Annotation: Codable, Hashable, Identifiable, Sendable {
         hypot(end.x - start.x, end.y - start.y)
     }
 
+    public func scaled(by factor: CGFloat) -> Annotation {
+        var copy = self
+        copy.start = CGPoint(x: start.x * factor, y: start.y * factor)
+        copy.end = CGPoint(x: end.x * factor, y: end.y * factor)
+        return copy
+    }
+
     public func translated(by delta: CGVector) -> Annotation {
         var copy = self
         copy.start = CGPoint(x: start.x + delta.dx, y: start.y + delta.dy)

@@ -42,7 +42,26 @@ private struct CanvasView: View {
             ZStack(alignment: .topLeading) {
                 Color(nsColor: .underPageBackgroundColor)
 
-                if let preview = model.preview {
+                if model.showOriginal {
+                    let source = CGSize(width: model.source.width, height: model.source.height)
+                    // Same zoom as the finished preview, so the two compare like for like.
+                    let fit = min(scale, available.width / source.width, available.height / source.height)
+                    let shown = CGSize(width: source.width * fit, height: source.height * fit)
+                    Image(decorative: model.source, scale: 1)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: shown.width, height: shown.height)
+                        .overlay(Rectangle().strokeBorder(Color.primary.opacity(0.15)))
+                        .offset(x: insets.leading + (available.width - shown.width) / 2,
+                                y: insets.top + (available.height - shown.height) / 2)
+                    Text("Original capture")
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(.regularMaterial, in: Capsule())
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 8)
+                } else if let preview = model.preview {
                     Image(decorative: preview, scale: 1)
                         .resizable()
                         .interpolation(.high)
@@ -109,15 +128,20 @@ private struct ActionBar: View {
             Label("\(Int(size.width)) × \(Int(size.height)) px", systemImage: "aspectratio")
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
-            if model.trimmedSomething {
-                Text(model.hasPlainBackground ? "Margins balanced" : "Margins trimmed")
+            let fixes = model.fixes
+            if !fixes.isEmpty {
+                Label(fixes.joined(separator: " · "), systemImage: "wand.and.stars")
                     .font(.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
                     .background(.quaternary, in: Capsule())
                     .foregroundStyle(.secondary)
+                    .help("Improved automatically: " + fixes.joined(separator: ", "))
             }
-            Spacer()
+            Spacer(minLength: 8)
+            CompareButton(model: model)
             DragOutHandle(model: model)
             Button("Save As…", action: actions.saveAs)
             Button(action: actions.save) {
@@ -147,6 +171,24 @@ struct Checkerboard: View {
             }
         }
         .background(Color.white)
+    }
+}
+
+/// Hold to see the capture exactly as it was taken.
+private struct CompareButton: View {
+    @ObservedObject var model: EditorModel
+
+    var body: some View {
+        Label("Compare", systemImage: "rectangle.split.2x1")
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6)
+                .fill(model.showOriginal ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08)))
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in if !model.showOriginal { model.showOriginal = true } }
+                .onEnded { _ in model.showOriginal = false })
+            .help("Hold to see the original capture")
     }
 }
 
