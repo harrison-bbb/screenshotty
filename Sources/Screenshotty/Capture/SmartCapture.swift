@@ -47,6 +47,7 @@ final class SmartCapture {
         if NSWorkspace.shared.frontmostApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             previousApp = NSWorkspace.shared.frontmostApplication
         }
+        Log.write("picker opened over \(previousApp?.bundleIdentifier ?? "?")")
         NSApp.activate(ignoringOtherApps: true)
         for overlay in overlays {
             overlay.orderFrontRegardless()

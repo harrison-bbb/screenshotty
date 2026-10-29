@@ -69,12 +69,16 @@ final class WindowManager {
         welcomeWindow?.close()
     }
 
-    /// Shows a window on the Space you're on. Every Screenshotty window moves to the active Space, so
+    /// Screenshotty's windows open on the desktop you're on, including a full-screen app's own desktop
+    /// (macOS keeps ordinary windows off those and would otherwise switch you to another desktop).
+    static let stayOnCurrentDesktop: NSWindow.CollectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+
+    /// Shows a window on the desktop you're on. Every Screenshotty window moves to the active desktop, so
     /// activating the app never jumps you to another desktop where an older window happens to be.
     private func present(_ window: NSWindow) {
-        window.collectionBehavior.insert(.moveToActiveSpace)
+        window.collectionBehavior.formUnion(Self.stayOnCurrentDesktop)
         for other in NSApp.windows where other.styleMask.contains(.titled) {
-            other.collectionBehavior.insert(.moveToActiveSpace)
+            other.collectionBehavior.formUnion(Self.stayOnCurrentDesktop)
         }
         NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
