@@ -257,16 +257,6 @@ public enum ImageTrimmer {
         return Double(pixels.filter { $0.isClose(to: color, tolerance: tolerance) }.count) / Double(pixels.count)
     }
 
-    /// The crop rect of the content inside plain margins (the full image if there are none).
-    public static func contentRect(of image: CGImage, tolerance: Int = 2) -> CGRect {
-        analyze(image, tolerance: tolerance).contentRect
-    }
-
-    /// Returns the image with plain margins removed (or the original if there are none).
-    public static func trim(_ image: CGImage, tolerance: Int = 2) -> CGImage {
-        crop(image, to: contentRect(of: image, tolerance: tolerance))
-    }
-
     static func crop(_ image: CGImage, to rect: CGRect) -> CGImage {
         if rect.width == CGFloat(image.width), rect.height == CGFloat(image.height) { return image }
         return image.cropping(to: rect) ?? image
@@ -288,36 +278,28 @@ public struct PreparedShot {
 }
 
 public enum ShotPreparer {
-    public static func prepare(_ source: CGImage, settings: CompositionSettings) -> CGImage {
-        prepareShot(source, settings: settings).image
-    }
-
-    public static func prepareShot(_ source: CGImage, settings: CompositionSettings) -> PreparedShot {
-        guard settings.autoTrim else { return PreparedShot(image: source, offset: .zero) }
-        return prepareShot(source, analysis: ImageTrimmer.analyze(source), settings: settings)
-    }
-
-    /// Prepares a hand-cropped part of `source`. The offset still maps original capture pixels
-    /// (where annotations live) into the prepared image.
-    public static func prepareShot(_ source: CGImage, crop: CGRect?, analysis: ShotAnalysis?, settings: CompositionSettings) -> PreparedShot {
+    /// The one entry point: optional hand crop, then (with auto-trim) edge repair, trimming and an even
+    /// inner margin. The offset maps original capture pixels, where annotations live, into the result.
+    /// - Parameter analysis: Reuse an earlier analysis of the (cropped) image; the editor caches it so
+    ///   sliders stay fast. Computed when nil.
+    public static func prepareShot(_ source: CGImage, crop: CGRect? = nil, analysis: ShotAnalysis? = nil,
+                                   settings: CompositionSettings) -> PreparedShot {
         let cropRect = crop.map { $0.integral.intersection(CGRect(x: 0, y: 0, width: source.width, height: source.height)) }
         let working = cropRect.flatMap { source.cropping(to: $0) } ?? source
-        let analysis = analysis ?? ImageTrimmer.analyze(working, repairEdges: crop == nil)
-        var shot = settings.autoTrim ? prepareShot(working, analysis: analysis, settings: settings)
-                                     : PreparedShot(image: working, offset: .zero)
+        var shot = PreparedShot(image: working, offset: .zero)
+        if settings.autoTrim {
+            // A hand-made crop is the user's call, so edge repair is skipped then.
+            shot = trimmed(working, analysis: analysis ?? ImageTrimmer.analyze(working, repairEdges: crop == nil),
+                           settings: settings)
+        }
         if let cropRect {
             shot.offset = CGPoint(x: shot.offset.x - cropRect.minX, y: shot.offset.y - cropRect.minY)
         }
         return shot
     }
 
-    /// Same as above, reusing an analysis (the editor caches it so sliders stay fast).
-    public static func prepare(_ source: CGImage, analysis: ShotAnalysis, settings: CompositionSettings) -> CGImage {
-        prepareShot(source, analysis: analysis, settings: settings).image
-    }
-
-    public static func prepareShot(_ source: CGImage, analysis: ShotAnalysis, settings: CompositionSettings) -> PreparedShot {
-        guard settings.autoTrim else { return PreparedShot(image: source, offset: .zero) }
+    /// Crops to the analysed content and adds the inner margin in the screenshot's background colour.
+    static func trimmed(_ source: CGImage, analysis: ShotAnalysis, settings: CompositionSettings) -> PreparedShot {
         let content = ImageTrimmer.crop(source, to: analysis.contentRect)
         let cropOffset = CGPoint(x: -analysis.contentRect.minX, y: -analysis.contentRect.minY)
         guard let background = analysis.backgroundColor else { return PreparedShot(image: content, offset: cropOffset) }

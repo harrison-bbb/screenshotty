@@ -86,7 +86,7 @@ macOS asks for **Screen Recording** permission the first time you capture. Turn 
 **Captures come out as just the background.** macOS is blocking the capture, usually because permission was
 given to an older copy of the app. Screenshotty detects this and offers **Reset Permission**. You can also go to
 **Settings → Screen Recording → Reset**. Screenshotty restarts and macOS asks again. Version 0.1.1 and later
-keep the permission across updates.
+keep the permission across updates. If only the floating preview showed the background, update to 0.3.1 or later.
 
 Diagnostics are written to `~/Library/Logs/Screenshotty.log`. Please attach it when you file an issue.
 

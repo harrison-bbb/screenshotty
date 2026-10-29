@@ -19,8 +19,8 @@ struct WelcomeView: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 step("1", "Press \(prefs.hotKey?.displayString ?? "the menu bar icon") to capture an area. Press Space to pick a window.")
-                step("2", "Pick a background, ratio and style. Screenshotty remembers your look.")
-                step("3", "Copy with ⌘C, save with ⌘S, or drag the image anywhere.")
+                step("2", "It opens already styled and tidied up. Pick a style, mockup or background; your look is remembered.")
+                step("3", "Copy with ⌘C, save with ⌘S, or drag the preview straight into any app.")
             }
             .padding(16)
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))

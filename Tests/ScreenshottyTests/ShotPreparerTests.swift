@@ -26,7 +26,7 @@ import Testing
         var settings = CompositionSettings()
         settings.innerPadding = 50
         settings.cornerRadius = 0
-        let shot = ShotPreparer.prepare(tightTextShot(), settings: settings)
+        let shot = ShotPreparer.prepareShot(tightTextShot(), settings: settings).image
         // Content is 900x560, unit 0.9 => 45px margin on every side.
         #expect(shot.width == 990 && shot.height == 650)
         let pixels = try #require(RGBABuffer(image: shot))
@@ -41,7 +41,7 @@ import Testing
         var settings = CompositionSettings()
         settings.innerPadding = 0
         settings.cornerRadius = 40
-        let shot = ShotPreparer.prepare(tightTextShot(), settings: settings)
+        let shot = ShotPreparer.prepareShot(tightTextShot(), settings: settings).image
         // 20 units * 0.9 = 18px on each side.
         #expect(shot.width == 900 + 36)
     }
@@ -55,7 +55,7 @@ import Testing
         let image = TestImages.make(width: 400, height: 300, background: .white, fills: fills)
         let analysis = ImageTrimmer.analyze(image)
         #expect(analysis.backgroundColor == nil)
-        #expect(ShotPreparer.prepare(image, settings: CompositionSettings()).width == 400)
+        #expect(ShotPreparer.prepareShot(image, settings: CompositionSettings()).image.width == 400)
     }
 
     @Test func colouredNavBarIsNotTreatedAsBackground() {
@@ -70,14 +70,14 @@ import Testing
     @Test func transparentWindowCaptureIsTrimmedButNotPadded() {
         let image = TestImages.make(width: 300, height: 200, background: nil,
                                     fills: [(CGRect(x: 20, y: 10, width: 200, height: 150), .white)])
-        let shot = ShotPreparer.prepare(image, settings: CompositionSettings())
+        let shot = ShotPreparer.prepareShot(image, settings: CompositionSettings()).image
         #expect(shot.width == 200 && shot.height == 150)
     }
 
     @Test func autoTrimOffKeepsCaptureUntouched() {
         var settings = CompositionSettings()
         settings.autoTrim = false
-        let shot = ShotPreparer.prepare(tightTextShot(), settings: settings)
+        let shot = ShotPreparer.prepareShot(tightTextShot(), settings: settings).image
         #expect(shot.width == 900 && shot.height == 600)
     }
 }
