@@ -21,7 +21,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Diagnostics: note every desktop (Space) switch and what's in front, to trace unexpected jumps.
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
                                                           object: nil, queue: .main) { _ in
-            Log.write("desktop switched: front=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?")")
+            let ours = NSApp.windows.filter(\.isVisible).map {
+                "\(type(of: $0))[\($0.title.isEmpty ? "-" : $0.title) here=\($0.isOnActiveSpace) alpha=\($0.alphaValue)]"
+            }
+            Log.write("desktop switched: front=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?") policy=\(NSApp.activationPolicy().rawValue) ours=\(ours.joined(separator: " "))")
         }
         // Load the on-device text recognition model now, so the first sensitive-info check is quick.
         Task.detached(priority: .utility) {
@@ -111,8 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Show in the Dock and app switcher only while a window is open.
     func updateActivationPolicy() {
         let hasWindows = NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) }
-        // Never turn into a Dock app while on a full-screen app's desktop: macOS would switch desktops.
-        let policy: NSApplication.ActivationPolicy = hasWindows && !WindowManager.isFullScreenDesktopActive() ? .regular : .accessory
+        let policy: NSApplication.ActivationPolicy = hasWindows && prefs.showInDock ? .regular : .accessory
         if NSApp.activationPolicy() != policy {
             NSApp.setActivationPolicy(policy)
         }
@@ -135,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(withTitle: "Open Image…", action: #selector(openImage), keyEquivalent: "")
         menu.addItem(withTitle: "Open from Clipboard", action: #selector(openFromClipboard), keyEquivalent: "")
         menu.addItem(withTitle: "Batch Export…", action: #selector(batchExport), keyEquivalent: "")
+        menu.addItem(withTitle: "Import Style…", action: #selector(importStyle), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         menu.addItem(withTitle: "Screenshotty on GitHub", action: #selector(openRepository), keyEquivalent: "")

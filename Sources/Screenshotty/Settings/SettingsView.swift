@@ -92,6 +92,8 @@ struct SettingsView: View {
             }
 
             Section("System") {
+                Toggle("Show in Dock while a window is open", isOn: $prefs.showInDock)
+                    .help("Adds a Dock icon and ⌘Tab entry for open editors. Can make macOS switch desktops right after a capture.")
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
                 LabeledContent("Screen Recording") {

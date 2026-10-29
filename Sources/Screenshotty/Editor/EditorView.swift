@@ -186,6 +186,12 @@ private struct EditorShortcuts: View {
             Button("Copy and Close", action: actions.copyAndClose).keyboardShortcut(on ? KeyboardShortcut(.return) : nil)
             Button("Undo") { model.undo() }.keyboardShortcut(on ? KeyboardShortcut("z") : nil)
             Button("Redo") { model.redo() }.keyboardShortcut(on ? KeyboardShortcut("z", modifiers: [.command, .shift]) : nil)
+            Button("Paste Image") {
+                if let image = AppDelegate.clipboardImage() { model.replaceImage(image) }
+            }
+            .keyboardShortcut(on ? KeyboardShortcut("v") : nil)
+            Button("Delete Annotation") { model.deleteSelected() }
+                .keyboardShortcut(on && model.selectedID != nil ? KeyboardShortcut(.delete, modifiers: []) : nil)
         }
         .opacity(0)
         .frame(width: 0, height: 0)

@@ -46,6 +46,12 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// Show a Dock icon (and ⌘Tab entry) while an editor or settings window is open. Off by default:
+    /// turning into a Dock app right after a capture can make macOS switch desktops.
+    @Published var showInDock: Bool {
+        didSet { defaults.set(showInDock, forKey: "showInDock") }
+    }
+
     @Published var captureStyle: CaptureStyle {
         didSet { defaults.set(captureStyle.rawValue, forKey: "captureStyle") }
     }
@@ -202,6 +208,7 @@ final class Preferences: ObservableObject {
         afterCapture = defaults.string(forKey: "afterCapture").flatMap(AfterCaptureAction.init(rawValue:)) ?? .openEditor
         upscaleSmallShots = defaults.object(forKey: "upscaleSmallShots") as? Bool ?? true
         captureStyle = defaults.string(forKey: "captureStyle").flatMap(CaptureStyle.init(rawValue:)) ?? .smart
+        showInDock = defaults.bool(forKey: "showInDock")
         autoHideSensitive = defaults.bool(forKey: "autoHideSensitive")
         sensitiveHideKind = defaults.string(forKey: "sensitiveHideKind").flatMap(Annotation.Kind.init(rawValue:))
             .flatMap { $0 == .blur ? .blur : .redact } ?? .redact
