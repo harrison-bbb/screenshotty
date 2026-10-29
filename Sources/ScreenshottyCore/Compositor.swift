@@ -38,10 +38,9 @@ public enum Compositor {
         return image
     }
 
-    /// Trims (if enabled) and renders in one step.
+    /// Prepares the shot (trim and even inner margin, if enabled) and renders in one step.
     public static func compose(_ source: CGImage, settings: CompositionSettings, scale: CGFloat = 1) throws -> CGImage {
-        let shot = settings.autoTrim ? ImageTrimmer.trim(source) : source
-        return try render(shot, settings: settings, scale: scale)
+        try render(ShotPreparer.prepare(source, settings: settings), settings: settings, scale: scale)
     }
 
     // MARK: - Pieces

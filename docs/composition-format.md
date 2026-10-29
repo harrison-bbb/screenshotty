@@ -20,7 +20,8 @@ A `padding` of 90 on a 2000 px wide screenshot is 180 px.
   "shadow": "medium",
   "windowChrome": "none",
   "frame": "none",
-  "autoTrim": true
+  "autoTrim": true,
+  "innerPadding": 40
 }
 ```
 
@@ -35,6 +36,7 @@ Every key is optional. Missing keys use the defaults shown above.
 | `windowChrome` | `none`, `light`, `dark` |
 | `frame` | `none`, `hairline`, `glass` |
 | `autoTrim` | `true` or `false` |
+| `innerPadding` | 0 to 150 units of the trimmed content. Only used when a plain background is detected. |
 
 Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
 
@@ -50,10 +52,12 @@ Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
 
 ## Layout rules
 
-1. If `autoTrim` is on, remove rows and columns at the edges that match the corner colour (or are transparent). This only happens when all four corners agree, within a per-channel tolerance of 2.
-2. The card is the screenshot plus a 28-unit title bar when `windowChrome` is not `none`.
-3. The minimum canvas is the card plus `padding` on each side, plus a 14-unit frame when `frame` is `glass`.
-4. For a fixed aspect ratio, the canvas grows along one axis until it matches.
-5. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.
+1. If `autoTrim` is on, look for a plain background. The candidate is the most common colour along the image edges. It counts as the background when it covers at least 70% of all edge pixels and at least 30% of each of the four edges, within a per-channel tolerance of 2. A transparent candidate means a window capture.
+2. Remove rows and columns at the edges that are entirely background.
+3. If the background is a colour (not transparent), add an even inner margin of that colour around the content: `innerPadding` units, and never less than half the corner radius, so rounded corners cannot clip the content.
+4. The card is the screenshot plus a 28-unit title bar when `windowChrome` is not `none`.
+5. The minimum canvas is the card plus `padding` on each side, plus a 14-unit frame when `frame` is `glass`.
+6. For a fixed aspect ratio, the canvas grows along one axis until it matches.
+7. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.
 
 Shadow parameters (blur, y-offset, opacity) are: soft (30, 8, 0.22), medium (50, 18, 0.35), strong (70, 28, 0.5).

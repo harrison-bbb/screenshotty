@@ -10,12 +10,17 @@ final class EditorModel: ObservableObject {
         didSet {
             guard settings != oldValue else { return }
             Preferences.shared.lastSettings = settings
-            if settings.autoTrim != oldValue.autoTrim { updateShot() } else { scheduleRender() }
+            if settings.autoTrim != oldValue.autoTrim || settings.innerPadding != oldValue.innerPadding
+                || settings.cornerRadius != oldValue.cornerRadius {
+                updateShot()
+            } else {
+                scheduleRender()
+            }
         }
     }
     @Published private(set) var preview: CGImage?
 
-    /// The screenshot after optional auto-trim.
+    /// The screenshot after optional trimming and inner margin.
     private(set) var shot: CGImage
     private var renderTask: Task<Void, Never>?
 
@@ -33,12 +38,16 @@ final class EditorModel: ObservableObject {
         CompositionLayout(imageSize: CGSize(width: shot.width, height: shot.height), settings: settings).canvasSize
     }
 
+    /// True when the screenshot sits on a plain background, so the inner margin applies.
+    @Published private(set) var hasPlainBackground = false
+
     var trimmedSomething: Bool {
         shot.width != source.width || shot.height != source.height
     }
 
     func replaceImage(_ image: CGImage) {
         source = image
+        analysis = nil
         updateShot()
     }
 
@@ -51,8 +60,13 @@ final class EditorModel: ObservableObject {
         try Compositor.render(shot, settings: settings)
     }
 
+    private var analysis: ShotAnalysis?
+
     private func updateShot() {
-        shot = settings.autoTrim ? ImageTrimmer.trim(source) : source
+        let analysis = self.analysis ?? ImageTrimmer.analyze(source)
+        self.analysis = analysis
+        hasPlainBackground = analysis.backgroundColor != nil
+        shot = ShotPreparer.prepare(source, analysis: analysis, settings: settings)
         scheduleRender(debounce: false)
     }
 

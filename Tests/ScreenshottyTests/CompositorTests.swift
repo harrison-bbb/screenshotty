@@ -39,6 +39,7 @@ import Testing
                                    fills: [(CGRect(x: 100, y: 100, width: 100, height: 50), .black)])
         var settings = CompositionSettings(background: .solid(.white), padding: 0, cornerRadius: 0, shadow: .none)
         settings.autoTrim = true
+        settings.innerPadding = 0
         let output = try Compositor.compose(shot, settings: settings)
         #expect(output.width == 100 && output.height == 50)
     }

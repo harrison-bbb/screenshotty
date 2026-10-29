@@ -57,6 +57,9 @@ enum CLI {
                 guard let v = value().flatMap(FrameStyle.init(rawValue:)) else { return fail("Invalid frame") }
                 settings.frame = v
             case "--no-trim": settings.autoTrim = false
+            case "--inner":
+                guard let v = value().flatMap(Double.init) else { return fail("Invalid inner margin") }
+                settings.innerPadding = v
             case "-h", "--help":
                 print(usage)
                 return 0
@@ -98,7 +101,8 @@ enum CLI {
       --shadow <style>     none, soft, medium, strong
       --chrome <style>     none, light, dark
       --frame <style>      none, hairline, glass
-      --no-trim            Keep uniform margins around the screenshot
+      --inner <units>      Even inner margin for screenshots on a plain background (default 40)
+      --no-trim            Keep the screenshot exactly as captured
       --settings <file>    Load settings from a JSON file (see docs/composition-format.md)
     """
 }

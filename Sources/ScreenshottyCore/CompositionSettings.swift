@@ -101,6 +101,9 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
     public var windowChrome: WindowChromeStyle
     public var frame: FrameStyle
     public var autoTrim: Bool
+    /// Even margin added inside the card, in the screenshot's own background colour, when the
+    /// screenshot is content on a plain background (e.g. text). Units of the trimmed content.
+    public var innerPadding: Double
 
     public init(background: BackgroundStyle = Presets.defaultBackground,
                 aspectRatio: AspectRatio = .auto,
@@ -109,7 +112,8 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
                 shadow: ShadowStyle = .medium,
                 windowChrome: WindowChromeStyle = .none,
                 frame: FrameStyle = .none,
-                autoTrim: Bool = true) {
+                autoTrim: Bool = true,
+                innerPadding: Double = 40) {
         self.background = background
         self.aspectRatio = aspectRatio
         self.padding = padding
@@ -118,16 +122,18 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         self.windowChrome = windowChrome
         self.frame = frame
         self.autoTrim = autoTrim
+        self.innerPadding = innerPadding
     }
 
     public static let `default` = CompositionSettings()
 
     public static let paddingRange: ClosedRange<Double> = 0...300
     public static let cornerRadiusRange: ClosedRange<Double> = 0...60
+    public static let innerPaddingRange: ClosedRange<Double> = 0...150
 
     // Tolerant decoding: missing keys fall back to defaults so old saved settings keep working.
     private enum CodingKeys: String, CodingKey {
-        case background, aspectRatio, padding, cornerRadius, shadow, windowChrome, frame, autoTrim
+        case background, aspectRatio, padding, cornerRadius, shadow, windowChrome, frame, autoTrim, innerPadding
     }
 
     public init(from decoder: Decoder) throws {
@@ -141,5 +147,6 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         windowChrome = (try? c.decode(WindowChromeStyle.self, forKey: .windowChrome)) ?? d.windowChrome
         frame = (try? c.decode(FrameStyle.self, forKey: .frame)) ?? d.frame
         autoTrim = (try? c.decode(Bool.self, forKey: .autoTrim)) ?? d.autoTrim
+        innerPadding = (try? c.decode(Double.self, forKey: .innerPadding)) ?? d.innerPadding
     }
 }

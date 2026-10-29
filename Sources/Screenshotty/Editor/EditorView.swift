@@ -95,7 +95,7 @@ private struct ActionBar: View {
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
             if model.trimmedSomething {
-                Text("Margins trimmed")
+                Text(model.hasPlainBackground ? "Margins balanced" : "Margins trimmed")
                     .font(.caption)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)

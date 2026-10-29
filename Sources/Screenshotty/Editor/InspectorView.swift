@@ -18,8 +18,16 @@ struct InspectorView: View {
                 }
 
                 InspectorSection("Screenshot") {
-                    Toggle("Auto-trim margins", isOn: $model.settings.autoTrim)
-                        .help("Removes solid-colour or transparent borders so the content is perfectly centred")
+                    Toggle("Auto-trim and balance margins", isOn: $model.settings.autoTrim)
+                        .help("Removes uneven plain borders so the content is perfectly centred")
+                    if model.settings.autoTrim {
+                        LabeledSlider(title: "Inner margin", value: $model.settings.innerPadding,
+                                      range: CompositionSettings.innerPaddingRange)
+                            .disabled(!model.hasPlainBackground)
+                            .help(model.hasPlainBackground
+                                  ? "Even space around the content, in the screenshot's own background colour"
+                                  : "Only applies to screenshots with a plain background, such as text")
+                    }
                     LabeledSlider(title: "Corner radius", value: $model.settings.cornerRadius,
                                   range: CompositionSettings.cornerRadiusRange)
                     LabeledPicker(title: "Shadow", selection: $model.settings.shadow)
