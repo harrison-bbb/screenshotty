@@ -3,7 +3,7 @@ import Combine
 import ScreenshottyCore
 
 enum AnnotationTool: String, CaseIterable, Identifiable {
-    case select, arrow, box, blur, redact
+    case select, arrow, box, blur, redact, crop
     var id: String { rawValue }
 
     var kind: Annotation.Kind? {
@@ -13,6 +13,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .box: .box
         case .blur: .blur
         case .redact: .redact
+        case .crop: nil
         }
     }
 
@@ -23,6 +24,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .box: "Highlight box"
         case .blur: "Blur"
         case .redact: "Redact"
+        case .crop: "Crop"
         }
     }
 
@@ -33,6 +35,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .box: "rectangle"
         case .blur: "circle.grid.3x3.fill"
         case .redact: "rectangle.fill"
+        case .crop: "crop"
         }
     }
 
@@ -44,6 +47,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable {
         case .box: "b"
         case .blur: "u"
         case .redact: "r"
+        case .crop: "c"
         }
     }
 }
@@ -99,6 +103,27 @@ final class EditorModel: ObservableObject {
 
     /// True when slivers of desktop or another window were cut off the capture's edges.
     @Published private(set) var cleanedEdges = false
+    /// True when content cut through by the capture edge (half labels, clipped icons) was removed.
+    @Published private(set) var removedClippedContent = false
+
+    /// The part of the capture the user kept with the crop tool, in capture pixels. Nil = all of it.
+    @Published private(set) var crop: CGRect?
+
+    func setCrop(_ rect: CGRect?) {
+        let full = CGRect(x: 0, y: 0, width: source.width, height: source.height)
+        var cleaned = rect.map { $0.integral.intersection(full) }
+        if let c = cleaned, c.width < 8 || c.height < 8 || c == full { cleaned = nil }
+        guard cleaned != crop else { return }
+        crop = cleaned
+        analysis = nil
+        updateShot()
+    }
+
+    /// What auto-trim kept, in capture pixels (for showing it in the crop tool).
+    var autoContentRect: CGRect? {
+        guard settings.autoTrim, let analysis else { return nil }
+        return analysis.contentRect.offsetBy(dx: crop?.minX ?? 0, dy: crop?.minY ?? 0)
+    }
 
     /// While true the canvas shows the capture exactly as taken, for comparison.
     @Published var showOriginal = false
@@ -197,7 +222,9 @@ final class EditorModel: ObservableObject {
     /// Short descriptions of what was improved automatically, shown under the canvas.
     var fixes: [String] {
         var list: [String] = []
+        if crop != nil { list.append("Cropped") }
         if cleanedEdges { list.append("Edges cleaned") }
+        if removedClippedContent { list.append("Cut-off content removed") }
         if trimmedSomething { list.append(hasPlainBackground ? "Margins balanced" : "Margins trimmed") }
         if settings.smartBackground != nil { list.append("Colours matched") }
         if scanState == .done, !findings.isEmpty, visibleFindings.isEmpty { list.append("Sensitive info hidden") }
@@ -212,6 +239,7 @@ final class EditorModel: ObservableObject {
     func replaceImage(_ image: CGImage) {
         source = image
         analysis = nil
+        crop = nil
         smartSuggestions = Self.suggestions(for: image)
         if settings.smartBackground != nil { settings = settings.resolved(for: image) }
         recordUndo()
@@ -314,11 +342,14 @@ final class EditorModel: ObservableObject {
     // MARK: Rendering
 
     private func updateShot() {
-        let analysis = self.analysis ?? ImageTrimmer.analyze(source)
+        let working = crop.flatMap { source.cropping(to: $0) } ?? source
+        // A hand-made crop is the user's call, so slivers and clipped content are left alone.
+        let analysis = self.analysis ?? ImageTrimmer.analyze(working, repairEdges: crop == nil)
         self.analysis = analysis
         hasPlainBackground = analysis.backgroundColor != nil
         cleanedEdges = settings.autoTrim && analysis.cleanedEdges
-        prepared = ShotPreparer.prepareShot(source, analysis: analysis, settings: settings)
+        removedClippedContent = settings.autoTrim && analysis.removedClippedContent
+        prepared = ShotPreparer.prepareShot(source, crop: crop, analysis: analysis, settings: settings)
         scheduleRender(debounce: false)
     }
 

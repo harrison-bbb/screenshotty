@@ -11,12 +11,16 @@ public struct ShotAnalysis: Equatable, Sendable {
     public var transparentMargins: Bool
     /// True when thin slivers of something else (desktop, a neighbouring window) were cut off the edges.
     public var cleanedEdges: Bool
+    /// True when content that was cut off by the capture edge (half letters, clipped icons) was removed.
+    public var removedClippedContent: Bool
 
-    public init(contentRect: CGRect, backgroundColor: RGBAColor?, transparentMargins: Bool, cleanedEdges: Bool = false) {
+    public init(contentRect: CGRect, backgroundColor: RGBAColor?, transparentMargins: Bool, cleanedEdges: Bool = false,
+                removedClippedContent: Bool = false) {
         self.contentRect = contentRect
         self.backgroundColor = backgroundColor
         self.transparentMargins = transparentMargins
         self.cleanedEdges = cleanedEdges
+        self.removedClippedContent = removedClippedContent
     }
 }
 
@@ -40,16 +44,21 @@ public enum ImageTrimmer {
 
     /// - Parameter tolerance: Max per-channel difference (0...255) still treated as "the same colour".
     ///   Kept tight because screenshots are lossless and light UI greys (e.g. #F7F7FA) sit very close to white.
-    public static func analyze(_ image: CGImage, tolerance: Int = 2) -> ShotAnalysis {
+    /// - Parameter repairEdges: Cut slivers and clipped content off the edges. Off when the user has
+    ///   cropped by hand, since they chose the edges themselves.
+    public static func analyze(_ image: CGImage, tolerance: Int = 2, repairEdges: Bool = true) -> ShotAnalysis {
         let width = image.width
         let height = image.height
         let full = PixelBounds(x0: 0, y0: 0, x1: width, y1: height)
         guard width > 2, height > 2, let pixels = RGBABuffer(image: image) else {
             return ShotAnalysis(contentRect: full.rect, backgroundColor: nil, transparentMargins: false)
         }
+        guard repairEdges else { return analyzeMargins(pixels, in: full, tolerance: tolerance) }
         let bounds = sliverFreeBounds(pixels)
-        var result = analyzeMargins(pixels, in: bounds, tolerance: tolerance)
+        let unclipped = clippedContentFreeBounds(pixels, in: bounds)
+        var result = analyzeMargins(pixels, in: unclipped, tolerance: tolerance)
         result.cleanedEdges = bounds != full
+        result.removedClippedContent = unclipped != bounds
         return result
     }
 
@@ -114,7 +123,93 @@ public enum ImageTrimmer {
     static let maxSliverShare = 0.02
     static let maxSliverPixels = 16
 
-    private enum Side: CaseIterable { case top, bottom, left, right }
+    enum Side: CaseIterable { case top, bottom, left, right }
+
+    /// One line of pixels `depth` in from a side of `b`, sampled to at most ~1500 pixels.
+    static func line(_ pixels: RGBABuffer, _ side: Side, _ depth: Int, in b: PixelBounds) -> [RGBAPixel] {
+        let step: (Int) -> Int = { length in max(1, length / 1500) }
+        switch side {
+        case .top: return stride(from: b.x0, to: b.x1, by: step(b.width)).map { pixels[$0, b.y0 + depth] }
+        case .bottom: return stride(from: b.x0, to: b.x1, by: step(b.width)).map { pixels[$0, b.y1 - 1 - depth] }
+        case .left: return stride(from: b.y0, to: b.y1, by: step(b.height)).map { pixels[b.x0 + depth, $0] }
+        case .right: return stride(from: b.y0, to: b.y1, by: step(b.height)).map { pixels[b.x1 - 1 - depth, $0] }
+        }
+    }
+
+    static func cut(_ b: inout PixelBounds, _ side: Side, by depth: Int) {
+        switch side {
+        case .top: b.y0 += depth
+        case .bottom: b.y1 -= depth
+        case .left: b.x0 += depth
+        case .right: b.x1 -= depth
+        }
+    }
+
+    // MARK: Clipped content
+
+    /// Largest strip removed, as a share of the image size.
+    static let maxClippedShare = 0.25
+    /// The empty gap that must separate a clipped strip from the main content: at least this share
+    /// of the image size, and at least `minGapPixels`. Word spaces are far narrower, so a tight crop
+    /// of a sentence is never mistaken for clipped content.
+    static let minGapShare = 0.03
+    static let minGapPixels = 16
+
+    /// Bounds with content that the capture edge cut through removed, e.g. half a sidebar of labels
+    /// at the left of a sloppy selection ("rts", "ptions"). A strip is removed only when:
+    /// - the edge line is mostly background but has content running into it (it was cut),
+    /// - a clean, wide gap of background separates it from the rest, within the outer 25%,
+    /// - the strip itself is mostly background (text or icons, not a solid panel like a sidebar),
+    /// - and the content beyond the gap is at least twice as large as the strip.
+    static func clippedContentFreeBounds(_ pixels: RGBABuffer, in start: PixelBounds) -> PixelBounds {
+        var b = start
+        guard b.width >= 80, b.height >= 80 else { return b }
+        let outer = Side.allCases.map { line(pixels, $0, 0, in: b) }
+        guard let background = dominantColor(outer.flatMap { $0 }), background.a > 8 else { return b }
+        func isEmpty(_ l: [RGBAPixel]) -> Bool { coverage(l, of: background) >= 0.998 }
+
+        for side in Side.allCases {
+            let edge = line(pixels, side, 0, in: b)
+            let edgeCoverage = coverage(edge, of: background)
+            guard edgeCoverage >= 0.5, edgeCoverage < 0.995 else { continue }   // nothing cut, or a solid panel
+            let size = (side == .top || side == .bottom) ? b.height : b.width
+            let maxStrip = Int(Double(size) * maxClippedShare)
+            let minGap = max(minGapPixels, Int(Double(size) * minGapShare))
+            guard maxStrip + minGap < size / 2 else { continue }
+
+            // Find the first wide empty gap.
+            var gapStart: Int?
+            var run = 0
+            var depth = 1
+            while depth <= maxStrip + minGap {
+                if isEmpty(line(pixels, side, depth, in: b)) {
+                    if run == 0 { gapStart = depth }
+                    run += 1
+                    if run >= minGap { break }
+                } else {
+                    run = 0
+                    gapStart = nil
+                }
+                depth += 1
+            }
+            guard run >= minGap, let strip = gapStart, strip <= maxStrip else { continue }
+
+            // The strip is clipped text or icons on the background, not a filled panel.
+            let stripCoverage = (0..<strip).map { coverage(line(pixels, side, $0, in: b), of: background) }.reduce(0, +) / Double(strip)
+            guard stripCoverage >= 0.6 else { continue }
+
+            // Real content continues past the gap, and it's much bigger than the strip.
+            var first = strip + run
+            while first < size, isEmpty(line(pixels, side, first, in: b)) { first += 1 }
+            var far = 0
+            while far < size - first, isEmpty(line(pixels, side, size - 1 - far, in: b)) { far += 1 }
+            let contentSpan = size - far - first
+            guard first < size, contentSpan >= strip * 2 else { continue }
+
+            cut(&b, side, by: strip)
+        }
+        return b
+    }
 
     /// Bounds with thin foreign strips removed: e.g. 4 px of desktop caught by a sloppy drag next to a window.
     ///
@@ -126,15 +221,7 @@ public enum ImageTrimmer {
         var b = PixelBounds(x0: 0, y0: 0, x1: pixels.width, y1: pixels.height)
         guard pixels.width >= 40, pixels.height >= 40 else { return b }
 
-        func line(_ side: Side, _ depth: Int, in b: PixelBounds) -> [RGBAPixel] {
-            let step: (Int) -> Int = { length in max(1, length / 1500) }
-            switch side {
-            case .top: return stride(from: b.x0, to: b.x1, by: step(b.width)).map { pixels[$0, b.y0 + depth] }
-            case .bottom: return stride(from: b.x0, to: b.x1, by: step(b.width)).map { pixels[$0, b.y1 - 1 - depth] }
-            case .left: return stride(from: b.y0, to: b.y1, by: step(b.height)).map { pixels[b.x0 + depth, $0] }
-            case .right: return stride(from: b.y0, to: b.y1, by: step(b.height)).map { pixels[b.x1 - 1 - depth, $0] }
-            }
-        }
+        func line(_ side: Side, _ depth: Int, in b: PixelBounds) -> [RGBAPixel] { Self.line(pixels, side, depth, in: b) }
 
         let outer = Side.allCases.map { line($0, 0, in: b) }
         guard let frame = dominantColor(outer.flatMap { $0 }) else { return b }
@@ -152,12 +239,7 @@ public enum ImageTrimmer {
                 guard coverage(outer[index], of: color) < 0.6 else { continue }
                 // If a line before this one already has the background colour there is no sliver.
                 guard (1..<depth).allSatisfy({ coverage(line(side, $0, in: b), of: color) < 0.6 }) else { break }
-                switch side {
-                case .top: b.y0 += depth
-                case .bottom: b.y1 -= depth
-                case .left: b.x0 += depth
-                case .right: b.x1 -= depth
-                }
+                cut(&b, side, by: depth)
                 break
             }
         }
@@ -213,6 +295,20 @@ public enum ShotPreparer {
     public static func prepareShot(_ source: CGImage, settings: CompositionSettings) -> PreparedShot {
         guard settings.autoTrim else { return PreparedShot(image: source, offset: .zero) }
         return prepareShot(source, analysis: ImageTrimmer.analyze(source), settings: settings)
+    }
+
+    /// Prepares a hand-cropped part of `source`. The offset still maps original capture pixels
+    /// (where annotations live) into the prepared image.
+    public static func prepareShot(_ source: CGImage, crop: CGRect?, analysis: ShotAnalysis?, settings: CompositionSettings) -> PreparedShot {
+        let cropRect = crop.map { $0.integral.intersection(CGRect(x: 0, y: 0, width: source.width, height: source.height)) }
+        let working = cropRect.flatMap { source.cropping(to: $0) } ?? source
+        let analysis = analysis ?? ImageTrimmer.analyze(working, repairEdges: crop == nil)
+        var shot = settings.autoTrim ? prepareShot(working, analysis: analysis, settings: settings)
+                                     : PreparedShot(image: working, offset: .zero)
+        if let cropRect {
+            shot.offset = CGPoint(x: shot.offset.x - cropRect.minX, y: shot.offset.y - cropRect.minY)
+        }
+        return shot
     }
 
     /// Same as above, reusing an analysis (the editor caches it so sliders stay fast).

@@ -25,7 +25,8 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 - **Styles.** One-click looks for X, LinkedIn, Instagram, product launches, mobile apps, MacBook shots and docs, each with an exact export size. Save your own look as a style. Batch Export applies a style to a whole folder of screenshots.
 - **Browser frames and mockups.** A Safari-style window with your URL in the address bar, or a MacBook or iPhone drawn around the screenshot. They can be combined, like a browser on a MacBook.
 - **Quick preview.** After each capture a small card slides in at the bottom-left with the finished image. Copy, save, edit, or drag it straight into another app. It slides away on its own.
-- **Fixes sloppy captures.** Grabbed a few pixels of desktop or a neighbouring window? Those slivers are cut off automatically. Hold **Compare** in the editor to see the capture as it was taken.
+- **Fixes sloppy captures.** Grabbed a few pixels of desktop or a neighbouring window, or half of a sidebar's labels? Slivers and content cut off by the edge are removed automatically. Hold **Compare** in the editor to see the capture as it was taken.
+- **Crop.** Press <kbd>C</kbd> in the editor to choose exactly which part of the capture to show. Drag any edge or corner, or drag the box to move it.
 - **Auto-trim and balance.** Uneven plain margins are removed and replaced with an even inner margin in the screenshot's own background colour. Tight crops of text get breathing room, and rounded corners never clip your content. The result is centred to the pixel.
 - **Smart backgrounds, on by default.** Vibrant, mesh, pastel and dark looks generated from your screenshot's main accent colour. Every new capture gets its own matching background.
 - **Backgrounds.** 16 gradients, 8 mesh wallpapers, solid colours, your own image or desktop wallpaper (with blur), or transparent. Images you've used stay under Recent, one click away.
@@ -100,6 +101,7 @@ Diagnostics are written to `~/Library/Logs/Screenshotty.log`. Please attach it w
 | Replace screenshot from clipboard | <kbd>⌘</kbd><kbd>V</kbd> |
 | New capture (while the editor is open) | <kbd>⌘</kbd><kbd>N</kbd> |
 | Select, Arrow, Box, Blur, Redact | <kbd>V</kbd> <kbd>A</kbd> <kbd>B</kbd> <kbd>U</kbd> <kbd>R</kbd> |
+| Crop | <kbd>C</kbd>, then <kbd>Return</kbd> to apply or <kbd>Esc</kbd> to cancel |
 | Undo / redo annotation | <kbd>⌘</kbd><kbd>Z</kbd> / <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd> |
 | Delete selected annotation | <kbd>⌫</kbd> |
 

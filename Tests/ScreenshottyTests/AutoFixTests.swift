@@ -134,3 +134,65 @@ import Testing
         #expect(SmartBackground.hueDistance(palette.primaryHue, 0.66) < 0.05)
     }
 }
+
+@Suite struct ClippedContentTests {
+    let dark = RGBAColor(hex: "#101010")!
+    let white = RGBAColor.white
+
+    /// Dark page: label fragments touching the left edge, a wide gap, then a card and a text block.
+    func page(stripWidth: Int = 60, gapTo: Int = 260) -> CGImage {
+        var fills: [(CGRect, RGBAColor)] = []
+        for i in 0..<4 { fills.append((CGRect(x: 0, y: 100 + i * 200, width: stripWidth - i * 8, height: 30), white)) }
+        fills.append((CGRect(x: gapTo, y: 80, width: 1000, height: 600), white))
+        fills.append((CGRect(x: gapTo + 60, y: 760, width: 700, height: 40), white))
+        return TestImages.make(width: 1400, height: 1000, background: dark, fills: fills)
+    }
+
+    @Test func removesContentCutByTheEdge() {
+        let analysis = ImageTrimmer.analyze(page())
+        #expect(analysis.removedClippedContent)
+        #expect(analysis.contentRect.minX == 260)
+        #expect(analysis.backgroundColor == dark)
+    }
+
+    @Test func keepsATightCropOfASentence() {
+        // "Hi there, …" cropped tightly: words touch the edge and are separated by narrow spaces.
+        var fills: [(CGRect, RGBAColor)] = []
+        var x = 0
+        for word in [40, 110, 70, 160, 90, 130] {
+            fills.append((CGRect(x: x, y: 20, width: word, height: 40), white))
+            x += word + 14
+        }
+        let image = TestImages.make(width: x - 14, height: 80, background: dark, fills: fills)
+        #expect(!ImageTrimmer.analyze(image).removedClippedContent)
+    }
+
+    @Test func keepsASolidSidebar() {
+        let sidebar = RGBAColor(hex: "#1E293B")!
+        let image = TestImages.make(width: 1400, height: 1000, background: dark,
+                                    fills: [(CGRect(x: 0, y: 0, width: 250, height: 1000), sidebar),
+                                            (CGRect(x: 400, y: 100, width: 800, height: 600), white)])
+        #expect(!ImageTrimmer.analyze(image).removedClippedContent)
+    }
+
+    @Test func keepsContentWhenNothingElseIsThere() {
+        // Only the strip has content: removing it would leave nothing.
+        let image = TestImages.make(width: 1400, height: 1000, background: dark,
+                                    fills: [(CGRect(x: 0, y: 300, width: 200, height: 40), white),
+                                            (CGRect(x: 600, y: 500, width: 40, height: 40), white)])
+        #expect(!ImageTrimmer.analyze(image).removedClippedContent)
+    }
+
+    @Test func manualCropTurnsRepairOff() {
+        #expect(!ImageTrimmer.analyze(page(), repairEdges: false).removedClippedContent)
+    }
+
+    @Test func cropKeepsAnnotationOffsetsInOriginalPixels() {
+        var settings = CompositionSettings.default
+        settings.autoTrim = false
+        let shot = ShotPreparer.prepareShot(page(), crop: CGRect(x: 100, y: 50, width: 800, height: 600),
+                                            analysis: nil, settings: settings)
+        #expect(shot.image.width == 800)
+        #expect(shot.offset == CGPoint(x: -100, y: -50))
+    }
+}

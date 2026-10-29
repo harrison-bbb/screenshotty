@@ -42,7 +42,14 @@ private struct CanvasView: View {
             ZStack(alignment: .topLeading) {
                 Color(nsColor: .underPageBackgroundColor)
 
-                if model.showOriginal {
+                if model.tool == .crop {
+                    let source = CGSize(width: model.source.width, height: model.source.height)
+                    let fit = min(available.width / source.width, available.height / source.height)
+                    let shown = CGSize(width: source.width * fit, height: source.height * fit)
+                    CropView(model: model, frame: CGRect(x: insets.leading + (available.width - shown.width) / 2,
+                                                         y: insets.top + (available.height - shown.height) / 2,
+                                                         width: shown.width, height: shown.height))
+                } else if model.showOriginal {
                     let source = CGSize(width: model.source.width, height: model.source.height)
                     // Same zoom as the finished preview, so the two compare like for like.
                     let fit = min(scale, available.width / source.width, available.height / source.height)
@@ -84,7 +91,7 @@ private struct CanvasView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 40)
 
-                if !model.showOriginal {
+                if !model.showOriginal, model.tool != .crop {
                     SensitiveBanner(model: model)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .padding(.bottom, 10)
