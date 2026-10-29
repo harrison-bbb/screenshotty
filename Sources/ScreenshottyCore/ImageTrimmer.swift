@@ -104,24 +104,46 @@ public enum ImageTrimmer {
 /// Turns a raw capture into the "shot" that goes on the card:
 /// trims plain margins, then adds an even inner margin in the screenshot's own background colour,
 /// so text never touches the edge or gets clipped by rounded corners.
+public struct PreparedShot {
+    public var image: CGImage
+    /// Where the original capture's (0, 0) sits inside `image`. Used to place annotations.
+    public var offset: CGPoint
+
+    public init(image: CGImage, offset: CGPoint) {
+        self.image = image
+        self.offset = offset
+    }
+}
+
 public enum ShotPreparer {
     public static func prepare(_ source: CGImage, settings: CompositionSettings) -> CGImage {
-        guard settings.autoTrim else { return source }
-        return prepare(source, analysis: ImageTrimmer.analyze(source), settings: settings)
+        prepareShot(source, settings: settings).image
+    }
+
+    public static func prepareShot(_ source: CGImage, settings: CompositionSettings) -> PreparedShot {
+        guard settings.autoTrim else { return PreparedShot(image: source, offset: .zero) }
+        return prepareShot(source, analysis: ImageTrimmer.analyze(source), settings: settings)
     }
 
     /// Same as above, reusing an analysis (the editor caches it so sliders stay fast).
     public static func prepare(_ source: CGImage, analysis: ShotAnalysis, settings: CompositionSettings) -> CGImage {
-        guard settings.autoTrim else { return source }
+        prepareShot(source, analysis: analysis, settings: settings).image
+    }
+
+    public static func prepareShot(_ source: CGImage, analysis: ShotAnalysis, settings: CompositionSettings) -> PreparedShot {
+        guard settings.autoTrim else { return PreparedShot(image: source, offset: .zero) }
         let content = ImageTrimmer.crop(source, to: analysis.contentRect)
-        guard let background = analysis.backgroundColor else { return content }
+        let cropOffset = CGPoint(x: -analysis.contentRect.minX, y: -analysis.contentRect.minY)
+        guard let background = analysis.backgroundColor else { return PreparedShot(image: content, offset: cropOffset) }
 
         let unit = CGFloat(max(content.width, content.height)) / 1000
         // Always leave enough room that rounded corners can't clip the content.
         let minimumForCorners = CGFloat(settings.effectiveCornerRadius) * 0.5
         let margin = (max(CGFloat(settings.innerPadding), minimumForCorners) * unit).rounded()
-        guard margin >= 1 else { return content }
-        return pad(content, by: Int(margin), color: background) ?? content
+        guard margin >= 1, let padded = pad(content, by: Int(margin), color: background) else {
+            return PreparedShot(image: content, offset: cropOffset)
+        }
+        return PreparedShot(image: padded, offset: CGPoint(x: cropOffset.x + margin, y: cropOffset.y + margin))
     }
 
     static func pad(_ image: CGImage, by margin: Int, color: RGBAColor) -> CGImage? {

@@ -41,3 +41,9 @@ enum PNG {
         return ImageLoader.load(data)?.width
     }
 }
+
+extension JSON {
+    static func roundTrip(_ annotation: Annotation) throws -> Annotation {
+        try JSONDecoder().decode(Annotation.self, from: JSONEncoder().encode(annotation))
+    }
+}

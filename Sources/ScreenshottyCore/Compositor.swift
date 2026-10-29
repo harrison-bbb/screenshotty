@@ -38,9 +38,12 @@ public enum Compositor {
         return image
     }
 
-    /// Prepares the shot (trim and even inner margin, if enabled) and renders in one step.
-    public static func compose(_ source: CGImage, settings: CompositionSettings, scale: CGFloat = 1) throws -> CGImage {
-        try render(ShotPreparer.prepare(source, settings: settings), settings: settings, scale: scale)
+    /// Prepares the shot (trim and even inner margin, if enabled), draws annotations and renders in one step.
+    public static func compose(_ source: CGImage, settings: CompositionSettings, annotations: [Annotation] = [],
+                               scale: CGFloat = 1) throws -> CGImage {
+        let prepared = ShotPreparer.prepareShot(source, settings: settings)
+        let shot = AnnotationRenderer.apply(annotations, to: prepared.image, offset: prepared.offset)
+        return try render(shot, settings: settings, scale: scale)
     }
 
     // MARK: - Pieces

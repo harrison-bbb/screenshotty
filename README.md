@@ -25,6 +25,7 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 - **Backgrounds.** 16 gradients, 8 mesh wallpapers, solid colours, your own image or desktop wallpaper (with blur), or transparent.
 - **Social-ready sizes.** Auto, 1:1, 4:5, 4:3, 3:2, 16:9, 1.91:1 (LinkedIn and Open Graph) and 9:16.
 - **Styling.** Rounded corners, soft to strong shadows, macOS window chrome in light or dark, and a hairline or frosted-glass frame.
+- **Annotations.** Arrows, highlight boxes, blur and redact, drawn straight on the preview. They stick to your content even when you change the trim, size or background. Redact covers the area with a solid bar, so use it for anything secret.
 - **Fast export.** <kbd>⌘</kbd><kbd>C</kbd> to copy, <kbd>⌘</kbd><kbd>S</kbd> to save, or drag the image straight into Slack, X, Figma or Finder.
 - **Instant mode.** Optionally skip the editor and copy or save with your last style right after capturing.
 - **Also works on existing images.** Open any image, paste from the clipboard, or drop a file onto the editor.
@@ -91,6 +92,9 @@ Diagnostics are written to `~/Library/Logs/Screenshotty.log`. Please attach it w
 | Save as | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>S</kbd> |
 | Replace screenshot from clipboard | <kbd>⌘</kbd><kbd>V</kbd> |
 | New capture (while the editor is open) | <kbd>⌘</kbd><kbd>N</kbd> |
+| Select, Arrow, Box, Blur, Redact | <kbd>V</kbd> <kbd>A</kbd> <kbd>B</kbd> <kbd>U</kbd> <kbd>R</kbd> |
+| Undo / redo annotation | <kbd>⌘</kbd><kbd>Z</kbd> / <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd> |
+| Delete selected annotation | <kbd>⌫</kbd> |
 
 Everything else lives in the menu bar icon: full-screen capture, open an image, beautify the clipboard image, and settings.
 
@@ -119,7 +123,7 @@ Run the tests with `scripts/test.sh`. See [CONTRIBUTING.md](CONTRIBUTING.md) for
 
 ## Roadmap
 
-- Annotations (arrows, text, blur)
+- Text labels and numbered steps for annotations
 - Custom capture overlay
 - Scrolling capture
 - Windows version (the style format is documented in [docs/composition-format.md](docs/composition-format.md) so it can share presets)

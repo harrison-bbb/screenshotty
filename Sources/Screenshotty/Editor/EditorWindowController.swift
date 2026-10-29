@@ -69,11 +69,22 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         model.resetStyle()
     }
 
+    @MainActor @objc func undoAnnotation(_ sender: Any?) { model.undo() }
+    @MainActor @objc func redoAnnotation(_ sender: Any?) { model.redo() }
+    @MainActor @objc func deleteAnnotation(_ sender: Any?) { model.deleteSelected() }
+    @MainActor @objc func clearAnnotations(_ sender: Any?) { model.clearAnnotations() }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(pasteImage(_:)) {
-            return MainActor.assumeIsolated { AppDelegate.clipboardImage() != nil }
+        MainActor.assumeIsolated {
+            switch menuItem.action {
+            case #selector(pasteImage(_:)): AppDelegate.clipboardImage() != nil
+            case #selector(undoAnnotation(_:)): model.canUndo
+            case #selector(redoAnnotation(_:)): model.canRedo
+            case #selector(deleteAnnotation(_:)): model.selectedID != nil
+            case #selector(clearAnnotations(_:)): !model.annotations.isEmpty
+            default: true
+            }
         }
-        return true
     }
 
     @MainActor private func render() -> CGImage? {

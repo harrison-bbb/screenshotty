@@ -26,35 +26,50 @@ private struct CanvasView: View {
     @ObservedObject var model: EditorModel
     @State private var isDropTarget = false
 
+    /// Space around the preview inside the canvas area (top leaves room for the toolbar).
+    private let insets = EdgeInsets(top: 92, leading: 36, bottom: 28, trailing: 36)
+
     var body: some View {
-        ZStack {
-            Color(nsColor: .underPageBackgroundColor)
-            if let preview = model.preview {
-                Image(decorative: preview, scale: 1)
-                    .resizable()
-                    .interpolation(.high)
-                    .aspectRatio(contentMode: .fit)
-                    .background {
-                        if model.settings.background == .transparent { Checkerboard() }
-                    }
-                    .shadow(color: .black.opacity(0.18), radius: 14, y: 4)
-                    .padding(.horizontal, 36)
-                    .padding(.top, 52)
-                    .padding(.bottom, 28)
-                    .onDrag {
-                        guard let image = try? model.renderFull(), let url = Exporter.temporaryFile(image),
-                              let provider = NSItemProvider(contentsOf: url) else { return NSItemProvider() }
-                        provider.suggestedName = url.deletingPathExtension().lastPathComponent
-                        return provider
-                    }
-                    .help("Drag the image into any app, or press ⌘C to copy it")
-            } else {
-                ProgressView()
-            }
-            if isDropTarget {
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
-                    .padding(16)
+        GeometryReader { geo in
+            let canvas = model.outputSize
+            let available = CGSize(width: max(geo.size.width - insets.leading - insets.trailing, 1),
+                                   height: max(geo.size.height - insets.top - insets.bottom, 1))
+            let scale = min(available.width / canvas.width, available.height / canvas.height)
+            let size = CGSize(width: canvas.width * scale, height: canvas.height * scale)
+            let origin = CGPoint(x: insets.leading + (available.width - size.width) / 2,
+                                 y: insets.top + (available.height - size.height) / 2)
+
+            ZStack(alignment: .topLeading) {
+                Color(nsColor: .underPageBackgroundColor)
+
+                if let preview = model.preview {
+                    Image(decorative: preview, scale: 1)
+                        .resizable()
+                        .interpolation(.high)
+                        .background {
+                            if model.settings.background == .transparent { Checkerboard() }
+                        }
+                        .shadow(color: .black.opacity(0.18), radius: 14, y: 4)
+                        .frame(width: size.width, height: size.height)
+                        .offset(x: origin.x, y: origin.y)
+
+                    AnnotationOverlay(model: model, scale: scale)
+                        .frame(width: size.width, height: size.height)
+                        .offset(x: origin.x, y: origin.y)
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+
+                AnnotationToolbar(model: model)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
+
+                if isDropTarget {
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
+                        .padding(16)
+                }
             }
         }
         .onDrop(of: [.fileURL, .image], isTargeted: $isDropTarget) { providers in
@@ -103,6 +118,7 @@ private struct ActionBar: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            DragOutHandle(model: model)
             Button("Save As…", action: actions.saveAs)
             Button(action: actions.save) {
                 Label("Save", systemImage: "square.and.arrow.down")
@@ -131,5 +147,24 @@ struct Checkerboard: View {
             }
         }
         .background(Color.white)
+    }
+}
+
+/// Drag this into Slack, X, Figma or Finder to drop the finished PNG there.
+private struct DragOutHandle: View {
+    @ObservedObject var model: EditorModel
+
+    var body: some View {
+        Label("Drag", systemImage: "hand.draw")
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)))
+            .onDrag {
+                guard let image = try? model.renderFull(), let url = Exporter.temporaryFile(image),
+                      let provider = NSItemProvider(contentsOf: url) else { return NSItemProvider() }
+                provider.suggestedName = url.deletingPathExtension().lastPathComponent
+                return provider
+            }
+            .help("Drag the finished image into any app")
     }
 }

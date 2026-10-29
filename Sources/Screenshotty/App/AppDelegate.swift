@@ -281,8 +281,16 @@ enum MainMenu {
         main.addItem(submenu: file, title: "File")
 
         let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Undo", action: #selector(EditorWindowController.undoAnnotation(_:)), keyEquivalent: "z")
+        let redo = edit.addItem(withTitle: "Redo", action: #selector(EditorWindowController.redoAnnotation(_:)), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(.separator())
         edit.addItem(withTitle: "Copy Image", action: #selector(EditorWindowController.copyImage(_:)), keyEquivalent: "c")
         edit.addItem(withTitle: "Paste Image", action: #selector(EditorWindowController.pasteImage(_:)), keyEquivalent: "v")
+        let delete = edit.addItem(withTitle: "Delete Annotation", action: #selector(EditorWindowController.deleteAnnotation(_:)),
+                                  keyEquivalent: String(UnicodeScalar(NSBackspaceCharacter)!))
+        delete.keyEquivalentModifierMask = []
+        edit.addItem(withTitle: "Clear All Annotations", action: #selector(EditorWindowController.clearAnnotations(_:)), keyEquivalent: "")
         edit.addItem(.separator())
         edit.addItem(withTitle: "Reset Style", action: #selector(EditorWindowController.resetStyle(_:)), keyEquivalent: "")
         main.addItem(submenu: edit, title: "Edit")
