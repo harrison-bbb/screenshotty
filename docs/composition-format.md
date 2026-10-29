@@ -31,7 +31,7 @@ Every key is optional. Missing keys use the defaults shown above.
 | --- | --- |
 | `aspectRatio` | `auto`, `1:1`, `4:5`, `4:3`, `3:2`, `16:9`, `1.91:1`, `9:16` |
 | `padding` | 0 to 300 units |
-| `cornerRadius` | 0 to 60 units, clamped to half the shortest side |
+| `cornerRadius` | 0 to 60 units, clamped to half the shortest side. Capped at 24 while `windowChrome` is not `none`. |
 | `shadow` | `none`, `soft`, `medium`, `strong` |
 | `windowChrome` | `none`, `light`, `dark` |
 | `frame` | `none`, `hairline`, `glass` |
@@ -55,7 +55,7 @@ Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
 1. If `autoTrim` is on, look for a plain background. The candidate is the most common colour along the image edges. It counts as the background when it covers at least 70% of all edge pixels and at least 30% of each of the four edges, within a per-channel tolerance of 2. A transparent candidate means a window capture.
 2. Remove rows and columns at the edges that are entirely background.
 3. If the background is a colour (not transparent), add an even inner margin of that colour around the content: `innerPadding` units, and never less than half the corner radius, so rounded corners cannot clip the content.
-4. The card is the screenshot plus a 28-unit title bar when `windowChrome` is not `none`.
+4. The card is the screenshot plus a 28-unit title bar when `windowChrome` is not `none`. Traffic lights are 12 units wide, 20 units apart, with the first centred 20 units from the left, moved right only if needed to stay inside the rounded corner.
 5. The minimum canvas is the card plus `padding` on each side, plus a 14-unit frame when `frame` is `glass`.
 6. For a fixed aspect ratio, the canvas grows along one axis until it matches.
 7. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.

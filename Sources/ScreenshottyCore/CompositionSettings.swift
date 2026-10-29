@@ -129,6 +129,15 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
 
     public static let paddingRange: ClosedRange<Double> = 0...300
     public static let cornerRadiusRange: ClosedRange<Double> = 0...60
+    /// Largest radius used with a macOS title bar. Real macOS windows sit around this value, and
+    /// rounder corners would cut into the title bar and its traffic lights.
+    public static let maxChromeCornerRadius: Double = 24
+
+    /// The radius actually drawn: capped while window chrome is on. The stored value is kept, so
+    /// turning chrome off restores the user's rounder corners.
+    public var effectiveCornerRadius: Double {
+        windowChrome == .none ? cornerRadius : min(cornerRadius, Self.maxChromeCornerRadius)
+    }
     public static let innerPaddingRange: ClosedRange<Double> = 0...150
 
     // Tolerant decoding: missing keys fall back to defaults so old saved settings keep working.

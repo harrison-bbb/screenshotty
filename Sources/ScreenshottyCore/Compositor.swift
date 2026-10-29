@@ -82,7 +82,7 @@ public enum Compositor {
         if settings.windowChrome != .none {
             WindowChrome.draw(settings.windowChrome, in: ctx, rect: CGRect(x: card.minX, y: card.minY,
                                                                          width: card.width, height: layout.titleBarHeight),
-                              unit: layout.unit)
+                              unit: layout.unit, cornerRadius: layout.cornerRadius)
         }
         drawImage(source, in: layout.imageRect, ctx: ctx)
         ctx.endTransparencyLayer()

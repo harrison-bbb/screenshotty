@@ -28,8 +28,7 @@ struct InspectorView: View {
                                   ? "Even space around the content, in the screenshot's own background colour"
                                   : "Only applies to screenshots with a plain background, such as text")
                     }
-                    LabeledSlider(title: "Corner radius", value: $model.settings.cornerRadius,
-                                  range: CompositionSettings.cornerRadiusRange)
+                    CornerRadiusControl(settings: $model.settings)
                     LabeledPicker(title: "Shadow", selection: $model.settings.shadow)
                     LabeledPicker(title: "Window", selection: $model.settings.windowChrome)
                     LabeledPicker(title: "Frame", selection: $model.settings.frame)
@@ -188,5 +187,27 @@ struct CompactTabBar<Option: Hashable>: View {
         }
         .padding(2)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.07)))
+    }
+}
+
+/// Corner radius slider. With a window title bar the range tops out at a realistic macOS radius,
+/// so the title bar and traffic lights are never cut off. The user's own value is kept for later.
+struct CornerRadiusControl: View {
+    @Binding var settings: CompositionSettings
+
+    var body: some View {
+        let limited = settings.windowChrome != .none
+        let maximum = limited ? CompositionSettings.maxChromeCornerRadius : CompositionSettings.cornerRadiusRange.upperBound
+        VStack(alignment: .leading, spacing: 4) {
+            LabeledSlider(title: "Corner radius",
+                          value: Binding(get: { settings.effectiveCornerRadius },
+                                         set: { settings.cornerRadius = $0 }),
+                          range: 0...maximum)
+            if limited, settings.cornerRadius > CompositionSettings.maxChromeCornerRadius {
+                Text("Capped at \(Int(maximum)) while the window title bar is on.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }

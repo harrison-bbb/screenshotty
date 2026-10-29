@@ -11,7 +11,7 @@ final class EditorModel: ObservableObject {
             guard settings != oldValue else { return }
             Preferences.shared.lastSettings = settings
             if settings.autoTrim != oldValue.autoTrim || settings.innerPadding != oldValue.innerPadding
-                || settings.cornerRadius != oldValue.cornerRadius {
+                || settings.effectiveCornerRadius != oldValue.effectiveCornerRadius {
                 updateShot()
             } else {
                 scheduleRender()

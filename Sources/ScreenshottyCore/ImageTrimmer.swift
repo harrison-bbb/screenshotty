@@ -118,7 +118,7 @@ public enum ShotPreparer {
 
         let unit = CGFloat(max(content.width, content.height)) / 1000
         // Always leave enough room that rounded corners can't clip the content.
-        let minimumForCorners = CGFloat(settings.cornerRadius) * 0.5
+        let minimumForCorners = CGFloat(settings.effectiveCornerRadius) * 0.5
         let margin = (max(CGFloat(settings.innerPadding), minimumForCorners) * unit).rounded()
         guard margin >= 1 else { return content }
         return pad(content, by: Int(margin), color: background) ?? content

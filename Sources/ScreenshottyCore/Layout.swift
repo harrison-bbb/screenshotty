@@ -49,7 +49,7 @@ public struct CompositionLayout: Equatable, Sendable {
         cardRect = card
         imageRect = CGRect(x: card.minX, y: card.minY + titleBar, width: w, height: h)
         titleBarHeight = titleBar
-        cornerRadius = min(CGFloat(settings.cornerRadius) * unit, min(cardW, cardH) / 2)
+        cornerRadius = min(CGFloat(settings.effectiveCornerRadius) * unit, min(cardW, cardH) / 2)
         frameWidth = frame
     }
 
