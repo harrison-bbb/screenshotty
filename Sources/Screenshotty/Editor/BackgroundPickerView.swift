@@ -77,11 +77,8 @@ struct BackgroundPickerView: View {
                     .buttonStyle(.plain)
                 }
             }
-            Text("Colours picked from this screenshot. While a smart look is selected, every new capture gets its own matching background.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
+        .help("Colours picked from this screenshot. While a smart look is selected, every new capture gets its own matching background.")
     }
 
     private var gradientPanel: some View {

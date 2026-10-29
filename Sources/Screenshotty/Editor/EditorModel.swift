@@ -59,6 +59,7 @@ final class EditorModel: ObservableObject {
     @Published var settings: CompositionSettings {
         didSet {
             guard settings != oldValue else { return }
+            recordSettingsUndo(previous: oldValue)
             // Picking any non-matched background turns smart mode off.
             if let variant = settings.smartBackground,
                settings.background != smartSuggestions.first(where: { $0.variant == variant })?.style {
@@ -85,7 +86,7 @@ final class EditorModel: ObservableObject {
         }
     }
     @Published var selectedID: UUID?
-    @Published var tool: AnnotationTool = .arrow
+    @Published var tool: AnnotationTool = .select
     @Published var annotationColor: RGBAColor = Annotation.defaultColor {
         didSet {
             // Recolour the selected arrow or box too.
@@ -95,8 +96,18 @@ final class EditorModel: ObservableObject {
             annotations[index].color = annotationColor
         }
     }
-    private var undoStack: [[Annotation]] = []
-    private var redoStack: [[Annotation]] = []
+    /// Everything ⌘Z can take back: annotations, the look and the crop.
+    private struct EditState {
+        var annotations: [Annotation]
+        var settings: CompositionSettings
+        var crop: CGRect?
+    }
+    private var undoStack: [EditState] = []
+    private var redoStack: [EditState] = []
+    private var isRestoring = false
+    /// A burst of settings changes (a slider drag, typing a URL) counts as one undo step.
+    private var settingsEditOpen = false
+    private var settingsEditEnd: DispatchWorkItem?
 
     /// Backgrounds generated from this screenshot's colours.
     @Published private(set) var smartSuggestions: [SmartSuggestion] = []
@@ -117,6 +128,7 @@ final class EditorModel: ObservableObject {
         var cleaned = rect.map { $0.integral.intersection(full) }
         if let c = cleaned, c.width < 8 || c.height < 8 || c == full { cleaned = nil }
         guard cleaned != crop else { return }
+        if !isRestoring { recordUndo() }
         crop = cleaned
         analysis = nil
         updateShot()
@@ -282,8 +294,12 @@ final class EditorModel: ObservableObject {
         analysis = nil
         crop = nil
         smartSuggestions = Self.suggestions(for: image)
+        isRestoring = true
         if settings.smartBackground != nil { settings = settings.resolved(for: image) }
-        recordUndo()
+        isRestoring = false
+        // A new picture starts a new history.
+        undoStack.removeAll()
+        redoStack.removeAll()
         annotations = []
         selectedID = nil
         updateShot()
@@ -361,24 +377,59 @@ final class EditorModel: ObservableObject {
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }
 
+    private var currentState: EditState { EditState(annotations: annotations, settings: settings, crop: crop) }
+
     func undo() {
         guard let previous = undoStack.popLast() else { return }
-        redoStack.append(annotations)
-        annotations = previous
-        if let id = selectedID, !annotations.contains(where: { $0.id == id }) { selectedID = nil }
+        redoStack.append(currentState)
+        restore(previous)
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
-        undoStack.append(annotations)
-        annotations = next
+        undoStack.append(currentState)
+        restore(next)
+    }
+
+    private func restore(_ state: EditState) {
+        closeSettingsEdit()
+        isRestoring = true
+        annotations = state.annotations
+        settings = state.settings
+        setCrop(state.crop)
+        isRestoring = false
+        if let id = selectedID, !annotations.contains(where: { $0.id == id }) { selectedID = nil }
+        objectWillChange.send()
     }
 
     private func recordUndo() {
-        undoStack.append(annotations)
+        closeSettingsEdit()
+        push(currentState)
+    }
+
+    private func push(_ state: EditState) {
+        undoStack.append(state)
         if undoStack.count > 100 { undoStack.removeFirst() }
         redoStack.removeAll()
         objectWillChange.send()
+    }
+
+    /// Records the look before a change, once per burst of changes.
+    private func recordSettingsUndo(previous: CompositionSettings) {
+        guard !isRestoring else { return }
+        if !settingsEditOpen {
+            push(EditState(annotations: annotations, settings: previous, crop: crop))
+            settingsEditOpen = true
+        }
+        settingsEditEnd?.cancel()
+        let end = DispatchWorkItem { [weak self] in self?.settingsEditOpen = false }
+        settingsEditEnd = end
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: end)
+    }
+
+    private func closeSettingsEdit() {
+        settingsEditEnd?.cancel()
+        settingsEditOpen = false
     }
 
     // MARK: Rendering

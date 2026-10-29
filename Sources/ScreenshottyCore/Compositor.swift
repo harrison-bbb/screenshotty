@@ -139,19 +139,46 @@ public enum Compositor {
 
     // MARK: - Pieces
 
+    /// Frosted glass: the background behind the border is blurred, brightened and given a soft top
+    /// highlight, with a bright outer edge and a faint inner edge, like a pane of glass around the shot.
     private static func drawFrame(_ frame: FrameStyle, layout: CompositionLayout, in ctx: CGContext) {
-        guard frame == .glass else { return }
+        guard frame == .glass, layout.frameWidth > 0 else { return }
         let rect = layout.cardRect.insetBy(dx: -layout.frameWidth, dy: -layout.frameWidth)
-        let path = CGPath(roundedRect: rect,
-                          cornerWidth: layout.cornerRadius + layout.frameWidth,
-                          cornerHeight: layout.cornerRadius + layout.frameWidth, transform: nil)
+        let radius = layout.cornerRadius + layout.frameWidth
+        let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        let scale = ctx.ctm.a
+        let line = max(layout.unit * 0.75, 1 / scale)
+
         ctx.saveGState()
         ctx.addPath(path)
-        ctx.setFillColor(RGBAColor.white.withAlpha(0.22).cgColor)
-        ctx.fillPath()
-        ctx.addPath(path)
-        ctx.setStrokeColor(RGBAColor.white.withAlpha(0.45).cgColor)
-        ctx.setLineWidth(max(layout.unit, 1))
+        ctx.clip()
+        // Blur what's behind the pane. The bitmap's first row is the top, matching layout space.
+        if let snapshot = ctx.makeImage(),
+           let behind = snapshot.cropping(to: CGRect(x: rect.minX * scale, y: rect.minY * scale,
+                                                     width: rect.width * scale, height: rect.height * scale)),
+           let blurred = BackgroundRenderer.blur(behind, radius: layout.frameWidth * 1.2 * scale) {
+            drawImage(blurred, in: rect, ctx: ctx)
+        }
+        // Milky tint, brighter at the top.
+        if let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
+                                     colors: [RGBAColor.white.withAlpha(0.34).cgColor,
+                                              RGBAColor.white.withAlpha(0.14).cgColor] as CFArray,
+                                     locations: [0, 1]) {
+            ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: rect.minY), end: CGPoint(x: 0, y: rect.maxY), options: [])
+        }
+        ctx.restoreGState()
+
+        ctx.saveGState()
+        // Bright outer edge and a faint shadow line where the pane meets the screenshot.
+        ctx.addPath(CGPath(roundedRect: rect.insetBy(dx: line / 2, dy: line / 2), cornerWidth: radius - line / 2,
+                           cornerHeight: radius - line / 2, transform: nil))
+        ctx.setStrokeColor(RGBAColor.white.withAlpha(0.6).cgColor)
+        ctx.setLineWidth(line)
+        ctx.strokePath()
+        let card = layout.cardRect.insetBy(dx: -line / 2, dy: -line / 2)
+        ctx.addPath(CGPath(roundedRect: card, cornerWidth: layout.cornerRadius + line / 2,
+                           cornerHeight: layout.cornerRadius + line / 2, transform: nil))
+        ctx.setStrokeColor(RGBAColor.black.withAlpha(0.12).cgColor)
         ctx.strokePath()
         ctx.restoreGState()
     }
@@ -184,14 +211,20 @@ public enum Compositor {
         ctx.restoreGState()
 
         if settings.frame == .hairline, layout.device == nil {
+            // Two hairlines, like a macOS window edge: a dark one just outside defines the edge on light
+            // backgrounds, a light one just inside catches the light on dark ones.
             ctx.saveGState()
-            let inset = max(layout.unit, 1) / 2
-            ctx.addPath(CGPath(roundedRect: card.insetBy(dx: inset, dy: inset),
-                               cornerWidth: max(layout.cornerRadius - inset, 0),
-                               cornerHeight: max(layout.cornerRadius - inset, 0), transform: nil))
-            ctx.setStrokeColor(RGBAColor.white.withAlpha(0.35).cgColor)
-            ctx.setLineWidth(max(layout.unit, 1))
-            ctx.strokePath()
+            let line = max(layout.unit * 0.6, 1 / ctx.ctm.a)
+            func stroke(_ offset: CGFloat, _ color: RGBAColor) {
+                let r = card.insetBy(dx: offset, dy: offset)
+                let radius = max(layout.cornerRadius - offset, 0)
+                ctx.addPath(CGPath(roundedRect: r, cornerWidth: radius, cornerHeight: radius, transform: nil))
+                ctx.setStrokeColor(color.cgColor)
+                ctx.strokePath()
+            }
+            ctx.setLineWidth(line)
+            stroke(-line / 2, RGBAColor.black.withAlpha(0.22))
+            stroke(line / 2, RGBAColor.white.withAlpha(0.28))
             ctx.restoreGState()
         }
     }
@@ -302,7 +335,7 @@ public enum BackgroundRenderer {
 
     private static let ciContext = CIContext(options: [.cacheIntermediates: false])
 
-    private static func blur(_ image: CGImage, radius: CGFloat) -> CGImage? {
+    static func blur(_ image: CGImage, radius: CGFloat) -> CGImage? {
         guard radius > 0.5 else { return image }
         let input = CIImage(cgImage: image).clampedToExtent()
         guard let filter = CIFilter(name: "CIGaussianBlur") else { return nil }

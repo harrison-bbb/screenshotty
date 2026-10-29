@@ -3,11 +3,11 @@ import Foundation
 import ScreenshottyCore
 
 enum AfterCaptureAction: String, CaseIterable, Identifiable {
-    case quickPreview, openEditor, copy, save
+    case openEditor, quickPreview, copy, save
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .quickPreview: "Show a quick preview"
+        case .quickPreview: "Show a floating preview (copy or drag without opening the editor)"
         case .openEditor: "Open the editor"
         case .copy: "Copy to clipboard instantly"
         case .save: "Save to folder instantly"
@@ -95,7 +95,7 @@ final class Preferences: ObservableObject {
         } else {
             hotKey = Self.loadJSON(HotKey.self, key: "hotKey", defaults: defaults) ?? .default
         }
-        afterCapture = defaults.string(forKey: "afterCapture").flatMap(AfterCaptureAction.init(rawValue:)) ?? .quickPreview
+        afterCapture = defaults.string(forKey: "afterCapture").flatMap(AfterCaptureAction.init(rawValue:)) ?? .openEditor
         upscaleSmallShots = defaults.object(forKey: "upscaleSmallShots") as? Bool ?? true
         autoHideSensitive = defaults.bool(forKey: "autoHideSensitive")
         sensitiveHideKind = defaults.string(forKey: "sensitiveHideKind").flatMap(Annotation.Kind.init(rawValue:))

@@ -51,8 +51,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        // Double-clicking the app again while it runs in the menu bar: show something useful.
-        if !flag { WindowManager.shared.showWelcome() }
+        // Opening the app again while it runs in the menu bar takes a screenshot, like the system
+        // Screenshot app. The welcome window only shows on the very first launch.
+        if !flag {
+            if prefs.hasLaunchedBefore { startCapture(.interactive) } else { WindowManager.shared.showWelcome() }
+        }
         return true
     }
 
@@ -90,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(withTitle: "Capture Full Screen", action: #selector(captureFullScreen), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Open Image…", action: #selector(openImage), keyEquivalent: "")
-        menu.addItem(withTitle: "Beautify Clipboard Image", action: #selector(beautifyClipboard), keyEquivalent: "")
+        menu.addItem(withTitle: "Open from Clipboard", action: #selector(openFromClipboard), keyEquivalent: "")
         menu.addItem(withTitle: "Batch Export…", action: #selector(batchExport), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
@@ -115,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        if let item = menu.items.first(where: { $0.action == #selector(beautifyClipboard) }) {
+        if let item = menu.items.first(where: { $0.action == #selector(openFromClipboard) }) {
             item.isEnabled = Self.clipboardImage() != nil
         }
     }
@@ -134,7 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         application(NSApp, open: panel.urls)
     }
 
-    @objc func beautifyClipboard() {
+    @objc func openFromClipboard() {
         guard let image = Self.clipboardImage() else {
             Toast.show("No image on the clipboard", systemImage: "exclamationmark.triangle.fill")
             return

@@ -9,21 +9,31 @@ struct StylePicker: View {
 
     var body: some View {
         let active = model.activeStyle?.id
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-            ForEach(prefs.allStyles) { style in
-                StyleCard(style: style, thumbnail: model.styleThumbnails[style.id], selected: active == style.id) {
-                    model.apply(style)
-                }
-                .contextMenu {
-                    if !style.isBuiltIn {
-                        Button("Update to Current Look") { update(style) }
-                        Button("Rename…") { rename(style) }
-                        Divider()
-                        Button("Delete", role: .destructive) { prefs.savedStyles.removeAll { $0.id == style.id } }
+        // One scrolling row keeps the inspector short. It bleeds to the panel edges.
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 8) {
+                    ForEach(prefs.allStyles) { style in
+                        StyleCard(style: style, thumbnail: model.styleThumbnails[style.id], selected: active == style.id) {
+                            model.apply(style)
+                        }
+                        .id(style.id)
+                        .contextMenu {
+                            if !style.isBuiltIn {
+                                Button("Update to Current Look") { update(style) }
+                                Button("Rename…") { rename(style) }
+                                Divider()
+                                Button("Delete", role: .destructive) { prefs.savedStyles.removeAll { $0.id == style.id } }
+                            }
+                        }
                     }
+                    SaveStyleCard(enabled: active == nil, action: save)
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 2)
             }
-            SaveStyleCard(enabled: active == nil, action: save)
+            .padding(.horizontal, -16)
+            .onAppear { if let active { proxy.scrollTo(active, anchor: .center) } }
         }
     }
 
@@ -85,7 +95,7 @@ private struct StyleCard: View {
                         ProgressView().controlSize(.small)
                     }
                 }
-                .frame(height: 78)
+                .frame(width: 112, height: 70)
                 .overlay(alignment: .topTrailing) {
                     if selected {
                         Image(systemName: "checkmark.circle.fill")
@@ -129,12 +139,12 @@ private struct SaveStyleCard: View {
             VStack(spacing: 6) {
                 Image(systemName: "plus")
                     .font(.system(size: 15, weight: .medium))
-                Text("Save current look")
+                Text("Save look")
                     .font(.system(size: 11.5, weight: .medium))
                     .multilineTextAlignment(.center)
             }
             .foregroundStyle(enabled ? Color.accentColor : Color.secondary)
-            .frame(maxWidth: .infinity, minHeight: 124)
+            .frame(width: 96, height: 112)
             .background(RoundedRectangle(cornerRadius: 11)
                 .strokeBorder(Color.primary.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
             .contentShape(RoundedRectangle(cornerRadius: 11))

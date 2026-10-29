@@ -24,8 +24,8 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 - **Never leak a secret.** Emails, API keys, tokens, card and phone numbers and IP addresses are found on your Mac (nothing is uploaded) and hidden in one click, with a solid bar or blur. Turn on Auto-hide once and every later capture is covered automatically.
 - **Styles.** Preview cards show your screenshot in each look: one-click looks for X, LinkedIn, Instagram, product launches, mobile apps, MacBook shots and docs, each with an exact export size. Save your own look as a style. Batch Export applies a style to a whole folder of screenshots.
 - **Browser frames and device mockups.** A Safari-style window with your URL in the address bar, or a MacBook or iPhone with their real screen shapes. Screen-shaped shots fill the display; a window sits on a Mac desktop; wide shots turn the iPhone landscape, and other tall shots get an iOS status bar. Combine them, like a browser on a MacBook.
-- **Quick preview.** After each capture a small card slides in at the bottom-left with the finished image. Copy, save, edit, or drag it straight into another app. It slides away on its own.
-- **Fixes sloppy captures.** Grabbed a few pixels of desktop or a neighbouring window, or half of a sidebar's labels? Slivers and content cut off by the edge are removed automatically. Hold **Compare** in the editor to see the capture as it was taken.
+- **Straight to the result.** Each capture opens in the editor, already styled. Prefer to keep moving? Switch to a floating preview card in Settings and copy, save or drag without opening the editor.
+- **Fixes sloppy captures.** Grabbed a few pixels of desktop or a neighbouring window, or half of a sidebar's labels? Slivers and content cut off by the edge are removed automatically. Hold the eye button in the editor to see the capture as it was taken.
 - **Crop.** Press <kbd>C</kbd> in the editor to choose exactly which part of the capture to show. Drag any edge or corner, or drag the box to move it.
 - **Auto-trim and balance.** Uneven plain margins are removed and replaced with an even inner margin in the screenshot's own background colour. Tight crops of text get breathing room, and rounded corners never clip your content. The result is centred to the pixel.
 - **Smart backgrounds, on by default.** Vibrant, mesh, pastel and dark looks generated from your screenshot's main accent colour. Every new capture gets its own matching background.
@@ -33,7 +33,7 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 - **Social-ready sizes.** Auto (follows the shot, but very wide or tall shots get extra padding so they never post as a thin strip), 1:1, 4:5, 4:3, 3:2, 16:9, 1.91:1 (LinkedIn and Open Graph) and 9:16.
 - **Styling.** Rounded corners, soft to strong shadows, macOS window chrome in light or dark, and a hairline or frosted-glass frame.
 - **Annotations.** Arrows, highlight boxes, blur and redact, drawn straight on the preview. They stick to your content even when you change the trim, size or background. Redact covers the area with a solid bar, so use it for anything secret.
-- **Fast export.** <kbd>⌘</kbd><kbd>C</kbd> to copy, <kbd>⌘</kbd><kbd>S</kbd> to save, or drag the image straight into Slack, X, Figma or Finder.
+- **Fast export.** <kbd>⌘</kbd><kbd>C</kbd> to copy, <kbd>⌘</kbd><kbd>S</kbd> to save, or drag the preview straight into Slack, X, Figma or Finder. <kbd>⌘</kbd><kbd>Z</kbd> undoes style changes as well as annotations.
 - **Sharp on every network.** Small captures are enlarged pixel-for-pixel on export, so text stays crisp after X, LinkedIn or Slack resize them.
 - **Instant mode.** Optionally skip the preview and copy or save with your last style right after capturing.
 - **Also works on existing images.** Open any image, paste from the clipboard, or drop a file onto the editor.
@@ -102,10 +102,10 @@ Diagnostics are written to `~/Library/Logs/Screenshotty.log`. Please attach it w
 | New capture (while the editor is open) | <kbd>⌘</kbd><kbd>N</kbd> |
 | Select, Arrow, Box, Blur, Redact | <kbd>V</kbd> <kbd>A</kbd> <kbd>B</kbd> <kbd>U</kbd> <kbd>R</kbd> |
 | Crop | <kbd>C</kbd>, then <kbd>Return</kbd> to apply or <kbd>Esc</kbd> to cancel |
-| Undo / redo annotation | <kbd>⌘</kbd><kbd>Z</kbd> / <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd> |
+| Undo / redo (style, crop and annotations) | <kbd>⌘</kbd><kbd>Z</kbd> / <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd> |
 | Delete selected annotation | <kbd>⌫</kbd> |
 
-Everything else lives in the menu bar icon: full-screen capture, open an image, beautify the clipboard image, batch export and settings.
+Everything else lives in the menu bar icon: full-screen capture, open an image or the clipboard, batch export and settings.
 
 ### Command line
 

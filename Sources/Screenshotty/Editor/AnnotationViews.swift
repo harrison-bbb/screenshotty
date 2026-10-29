@@ -15,8 +15,12 @@ struct AnnotationOverlay: View {
     private enum DragState {
         case drawing(start: CGPoint)
         case moving(id: UUID, last: CGPoint)
+        /// Select tool on empty canvas: becomes a drag of the finished image once the pointer moves.
         case idle
     }
+
+    /// Where the gesture that started a drag-out began, so its later events are ignored.
+    @State private var dragOutStart: CGPoint?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -33,6 +37,7 @@ struct AnnotationOverlay: View {
         .onHover { inside in
             if inside, model.tool != .select { NSCursor.crosshair.set() } else { NSCursor.arrow.set() }
         }
+        .help(model.tool == .select ? "Drag the image into any app, or click an annotation to edit it" : "")
         .onChange(of: model.tool) { _, tool in
             if tool != .select { model.selectedID = nil }
         }
@@ -45,6 +50,17 @@ struct AnnotationOverlay: View {
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
+                if let start = dragOutStart {
+                    if start == value.startLocation { return }   // still the same drag-out gesture
+                    dragOutStart = nil
+                    dragging = nil
+                }
+                if case .idle = dragging, hypot(value.translation.width, value.translation.height) > 4 {
+                    dragOutStart = value.startLocation
+                    dragging = nil
+                    DragOut.begin(model)
+                    return
+                }
                 let point = source(value.location)
                 switch dragging {
                 case nil:
@@ -55,6 +71,11 @@ struct AnnotationOverlay: View {
                 }
             }
             .onEnded { value in
+                if dragOutStart != nil {
+                    dragOutStart = nil
+                    dragging = nil
+                    return
+                }
                 finish(viewDistance: hypot(value.translation.width, value.translation.height))
             }
     }
@@ -174,6 +195,13 @@ private struct SelectionOutline: View {
 struct AnnotationToolbar: View {
     @ObservedObject var model: EditorModel
 
+    /// Colours only matter for arrows and boxes.
+    private var showsColors: Bool {
+        if model.tool == .arrow || model.tool == .box { return true }
+        guard let id = model.selectedID, let selected = model.annotations.first(where: { $0.id == id }) else { return false }
+        return selected.kind.usesColor
+    }
+
     var body: some View {
         HStack(spacing: 4) {
             ForEach(AnnotationTool.allCases) { tool in
@@ -194,6 +222,7 @@ struct AnnotationToolbar: View {
                 .accessibilityLabel(tool.title)
             }
 
+            if showsColors {
             Divider().frame(height: 18).padding(.horizontal, 4)
 
             ForEach(Annotation.palette, id: \.self) { color in
@@ -211,6 +240,7 @@ struct AnnotationToolbar: View {
                 .buttonStyle(.plain)
                 .help("Arrow and box colour")
             }
+            }
 
             Divider().frame(height: 18).padding(.horizontal, 4)
 
@@ -227,11 +257,61 @@ struct AnnotationToolbar: View {
             .buttonStyle(.plain)
             .disabled(model.selectedID == nil)
             .help("Delete selected (⌫)")
+
+            Divider().frame(height: 18).padding(.horizontal, 4)
+
+            CompareButton(model: model)
         }
+        .animation(.easeOut(duration: 0.15), value: showsColors)
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(.regularMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08)))
         .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+    }
+}
+
+/// Hold to see the capture exactly as it was taken.
+struct CompareButton: View {
+    @ObservedObject var model: EditorModel
+
+    var body: some View {
+        Image(systemName: model.showOriginal ? "eye.fill" : "eye")
+            .font(.system(size: 13, weight: .medium))
+            .frame(width: 30, height: 26)
+            .background(RoundedRectangle(cornerRadius: 6)
+                .fill(model.showOriginal ? Color.accentColor.opacity(0.9) : .clear))
+            .foregroundStyle(model.showOriginal ? Color.white : Color.primary)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { _ in if !model.showOriginal { model.showOriginal = true } }
+                .onEnded { _ in model.showOriginal = false })
+            .help("Hold to compare with the original capture")
+            .accessibilityLabel("Compare with original")
+    }
+}
+
+/// Starts a standard macOS drag of the finished PNG from wherever the pointer is.
+@MainActor
+enum DragOut {
+    private static let source = Source()
+
+    final class Source: NSObject, NSDraggingSource {
+        func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+            .copy
+        }
+    }
+
+    static func begin(_ model: EditorModel) {
+        guard let event = NSApp.currentEvent, let window = event.window ?? NSApp.keyWindow, let view = window.contentView,
+              let image = try? model.renderFull(), let url = Exporter.temporaryFile(image) else { return }
+        let item = NSDraggingItem(pasteboardWriter: url as NSURL)
+        let width: CGFloat = 180
+        let size = NSSize(width: width, height: width * CGFloat(image.height) / CGFloat(max(image.width, 1)))
+        let point = view.convert(event.locationInWindow, from: nil)
+        item.setDraggingFrame(NSRect(x: point.x - size.width / 2, y: point.y - size.height / 2,
+                                     width: size.width, height: size.height),
+                              contents: NSImage(cgImage: image, size: size))
+        view.beginDraggingSession(with: [item], event: event, source: source)
     }
 }

@@ -138,37 +138,68 @@ private struct ActionBar: View {
     var body: some View {
         HStack(spacing: 10) {
             let size = model.outputSize
-            Label("\(Int(size.width)) × \(Int(size.height)) px", systemImage: "aspectratio")
+            Text("\(Int(size.width)) × \(Int(size.height)) px")
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
-            let fixes = model.fixes
-            if !fixes.isEmpty {
-                Label(fixes.joined(separator: " · "), systemImage: "wand.and.stars")
-                    .font(.caption)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.quaternary, in: Capsule())
-                    .foregroundStyle(.secondary)
-                    .help("Improved automatically: " + fixes.joined(separator: ", "))
-            }
+            FixesChip(fixes: model.fixes)
             Spacer(minLength: 8)
-            CompareButton(model: model)
-            DragOutHandle(model: model)
-            Button("Save As…", action: actions.saveAs)
-            Button(action: actions.save) {
+            Menu {
+                Button("Save As…", action: actions.saveAs)
+            } label: {
                 Label("Save", systemImage: "square.and.arrow.down")
+            } primaryAction: {
+                actions.save()
             }
+            .menuStyle(.button)
+            .fixedSize()
+            .help("Save to your save folder (⌘S). Use the arrow for Save As.")
             Button(action: actions.copy) {
                 Label("Copy", systemImage: "doc.on.doc")
             }
             .buttonStyle(.borderedProminent)
+            .help("Copy the finished image (⌘C)")
         }
         .controlSize(.large)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.bar)
+    }
+}
+
+/// "3 fixes": what Screenshotty improved automatically. Click for the list.
+private struct FixesChip: View {
+    let fixes: [String]
+    @State private var showing = false
+
+    var body: some View {
+        if !fixes.isEmpty {
+            Button { showing.toggle() } label: {
+                Label(fixes.count == 1 ? fixes[0] : "\(fixes.count) fixes", systemImage: "wand.and.stars")
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+                    .foregroundStyle(Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .help(fixes.joined(separator: "\n"))
+            .popover(isPresented: $showing, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Improved automatically").font(.headline)
+                    ForEach(fixes, id: \.self) { fix in
+                        Label(fix, systemImage: "checkmark.circle.fill")
+                            .symbolRenderingMode(.multicolor)
+                    }
+                    Text("Hold the eye button in the toolbar to compare with the original.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(14)
+                .frame(width: 260)
+            }
+        }
     }
 }
 
@@ -234,39 +265,4 @@ private struct SensitiveBanner: View {
     }
 }
 
-/// Hold to see the capture exactly as it was taken.
-private struct CompareButton: View {
-    @ObservedObject var model: EditorModel
 
-    var body: some View {
-        Label("Compare", systemImage: "rectangle.split.2x1")
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 6)
-                .fill(model.showOriginal ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08)))
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { _ in if !model.showOriginal { model.showOriginal = true } }
-                .onEnded { _ in model.showOriginal = false })
-            .help("Hold to see the original capture")
-    }
-}
-
-/// Drag this into Slack, X, Figma or Finder to drop the finished PNG there.
-private struct DragOutHandle: View {
-    @ObservedObject var model: EditorModel
-
-    var body: some View {
-        Label("Drag", systemImage: "hand.draw")
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.08)))
-            .onDrag {
-                guard let image = try? model.renderFull(), let url = Exporter.temporaryFile(image),
-                      let provider = NSItemProvider(contentsOf: url) else { return NSItemProvider() }
-                provider.suggestedName = url.deletingPathExtension().lastPathComponent
-                return provider
-            }
-            .help("Drag the finished image into any app")
-    }
-}

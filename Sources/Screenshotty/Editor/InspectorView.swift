@@ -44,13 +44,11 @@ struct InspectorView: View {
                 InspectorSection("Screenshot", showsDivider: false) {
                     Toggle("Auto-trim and balance margins", isOn: $model.settings.autoTrim)
                         .help("Removes uneven borders, slivers and cut-off content so the content is perfectly centred")
-                    if model.settings.autoTrim {
+                    // Only shown when it does something: screenshots of content on a plain background.
+                    if model.settings.autoTrim, model.hasPlainBackground {
                         LabeledSlider(title: "Inner margin", value: $model.settings.innerPadding,
                                       range: CompositionSettings.innerPaddingRange)
-                            .disabled(!model.hasPlainBackground)
-                            .help(model.hasPlainBackground
-                                  ? "Even space around the content, in the screenshot's own background colour"
-                                  : "Only applies to screenshots with a plain background, such as text")
+                            .help("Even space around the content, in the screenshot's own background colour")
                     }
                 }
 
