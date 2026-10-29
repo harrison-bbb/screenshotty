@@ -111,7 +111,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Show in the Dock and app switcher only while a window is open.
     func updateActivationPolicy() {
         let hasWindows = NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) }
-        let policy: NSApplication.ActivationPolicy = hasWindows ? .regular : .accessory
+        // Never turn into a Dock app while on a full-screen app's desktop: macOS would switch desktops.
+        let policy: NSApplication.ActivationPolicy = hasWindows && !WindowManager.isFullScreenDesktopActive() ? .regular : .accessory
         if NSApp.activationPolicy() != policy {
             NSApp.setActivationPolicy(policy)
         }

@@ -73,6 +73,23 @@ final class WindowManager {
     /// (macOS keeps ordinary windows off those and would otherwise switch you to another desktop).
     static let stayOnCurrentDesktop: NSWindow.CollectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
 
+    /// True when the desktop you're on belongs to a full-screen app: another app's window covers a whole
+    /// display, menu bar area included, which ordinary (non-full-screen) windows can't.
+    static func isFullScreenDesktopActive() -> Bool {
+        let ownPID = ProcessInfo.processInfo.processIdentifier
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] else { return false }
+        let screens = NSScreen.screens.map(ScreenFreezer.globalFrame(of:))
+        return list.contains { info in
+            guard (info[kCGWindowLayer as String] as? Int) == 0,
+                  (info[kCGWindowOwnerPID as String] as? pid_t) != ownPID,
+                  let dict = info[kCGWindowBounds as String] as? NSDictionary,
+                  let bounds = CGRect(dictionaryRepresentation: dict) else { return false }
+            return screens.contains { abs($0.minX - bounds.minX) < 1 && abs($0.minY - bounds.minY) < 1 &&
+                abs($0.width - bounds.width) < 1 && abs($0.height - bounds.height) < 1 }
+        }
+    }
+
     /// Shows a window on the desktop you're on. Every Screenshotty window moves to the active desktop, so
     /// activating the app never jumps you to another desktop where an older window happens to be.
     private func present(_ window: NSWindow) {
@@ -80,9 +97,13 @@ final class WindowManager {
         for other in NSApp.windows where other.styleMask.contains(.titled) {
             other.collectionBehavior.formUnion(Self.stayOnCurrentDesktop)
         }
-        NSApp.setActivationPolicy(.regular)
+        // Becoming a Dock app makes macOS leave a full-screen app's desktop. Over full-screen apps, stay a
+        // menu bar app so the window opens right where you are.
+        let fullScreen = Self.isFullScreenDesktopActive()
+        if !fullScreen { NSApp.setActivationPolicy(.regular) }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        Log.write("presenting window: fullScreenDesktop=\(fullScreen)")
         // Diagnostics for "the capture jumped me somewhere else": what's in front once things settle.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak window] in
             let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"

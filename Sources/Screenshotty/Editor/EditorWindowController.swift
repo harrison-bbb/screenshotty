@@ -25,7 +25,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             copy: { [weak self] in self?.copyImage(nil) },
             save: { [weak self] in self?.saveImage(nil) },
             saveAs: { [weak self] in self?.saveImageAs(nil) },
-            saveProject: { [weak self] in self?.saveProject(nil) })
+            saveProject: { [weak self] in self?.saveProject(nil) },
+            copyAndClose: { [weak self] in self?.copyAndClose(nil) })
         window.contentViewController = NSHostingController(rootView: EditorView(model: model, actions: actions))
         window.setContentSize(NSSize(width: 1180, height: 760))
         window.delegate = self
@@ -169,4 +170,5 @@ struct EditorActions {
     var save: () -> Void
     var saveAs: () -> Void
     var saveProject: () -> Void
+    var copyAndClose: () -> Void
 }

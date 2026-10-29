@@ -166,6 +166,30 @@ private struct ActionBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.bar)
+        .background { EditorShortcuts(model: model, actions: actions) }
+    }
+}
+
+/// The editor's main shortcuts, attached to the window itself. Over full-screen apps Screenshotty runs as a
+/// menu bar app with no visible menu bar, so these must not depend on the menus. Off while typing.
+private struct EditorShortcuts: View {
+    @ObservedObject var model: EditorModel
+    let actions: EditorActions
+
+    var body: some View {
+        let on = !model.isTyping
+        ZStack {
+            Button("Copy", action: actions.copy).keyboardShortcut(on ? KeyboardShortcut("c") : nil)
+            Button("Save", action: actions.save).keyboardShortcut(on ? KeyboardShortcut("s") : nil)
+            Button("Save As", action: actions.saveAs).keyboardShortcut(on ? KeyboardShortcut("s", modifiers: [.command, .shift]) : nil)
+            Button("Save Project", action: actions.saveProject).keyboardShortcut(on ? KeyboardShortcut("s", modifiers: [.command, .option]) : nil)
+            Button("Copy and Close", action: actions.copyAndClose).keyboardShortcut(on ? KeyboardShortcut(.return) : nil)
+            Button("Undo") { model.undo() }.keyboardShortcut(on ? KeyboardShortcut("z") : nil)
+            Button("Redo") { model.redo() }.keyboardShortcut(on ? KeyboardShortcut("z", modifiers: [.command, .shift]) : nil)
+        }
+        .opacity(0)
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
     }
 }
 
