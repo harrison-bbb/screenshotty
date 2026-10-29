@@ -43,6 +43,9 @@ final class SmartCapture {
     }
 
     private func show() {
+        if NSWorkspace.shared.frontmostApplication?.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            previousApp = NSWorkspace.shared.frontmostApplication
+        }
         NSApp.activate(ignoringOtherApps: true)
         for overlay in overlays {
             overlay.orderFrontRegardless()
@@ -83,7 +86,12 @@ final class SmartCapture {
     // MARK: Finishing
 
     func finish(rect: CGRect, windowID: CGWindowID?, on frozen: FrozenScreen) {
-        close()
+        // Hide the overlay but keep its windows until the editor is up. If Screenshotty had no windows for
+        // a moment, macOS would hand focus to another app (often on another desktop) and pull you away.
+        overlays.forEach {
+            $0.alphaValue = 0
+            $0.ignoresMouseEvents = true
+        }
         Task { @MainActor in
             var image: CGImage?
             if let windowID {
@@ -97,15 +105,30 @@ final class SmartCapture {
                 continuation?.resume(returning: .cancelled)
             }
             continuation = nil
+            // The editor (if any) is on screen by now: remove the overlay, and if nothing of ours is
+            // showing, give focus straight back to the app the user was in.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                MainActor.assumeIsolated {
+                    self.close()
+                    self.returnFocusIfIdle()
+                }
+            }
         }
+    }
+
+    /// The app that was in front before the picker opened.
+    private var previousApp: NSRunningApplication?
+
+    private func returnFocusIfIdle() {
+        let showing = NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) }
+        if !showing { previousApp?.activate() }
     }
 
     func cancel() {
         close()
         continuation?.resume(returning: .cancelled)
         continuation = nil
-        // Give focus back to the app the user was in.
-        if !NSApp.windows.contains(where: { $0.isVisible && $0.styleMask.contains(.titled) }) { NSApp.hide(nil) }
+        returnFocusIfIdle()
     }
 
     private func close() {

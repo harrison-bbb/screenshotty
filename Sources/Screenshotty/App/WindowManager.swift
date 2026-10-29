@@ -79,5 +79,10 @@ final class WindowManager {
         NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        // Diagnostics for "the capture jumped me somewhere else": what's in front once things settle.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak window] in
+            let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?"
+            Log.write("window shown: front=\(front) key=\(window?.isKeyWindow ?? false) activeSpace=\(window?.isOnActiveSpace ?? false)")
+        }
     }
 }
