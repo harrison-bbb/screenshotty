@@ -348,47 +348,62 @@ final class OverlayView: NSView {
         ctx.restoreGState()
 
         let selection = shown.map { $0.integral.intersection(bounds) }
-        // Dim everything except the selection.
+        // A soft spotlight: the rest of the screen dims gently, the selection stays untouched.
+        let radius = selection.map { min(10, min($0.width, $0.height) / 4) } ?? 0
+        let selectionPath = selection.map { CGPath(roundedRect: $0, cornerWidth: radius, cornerHeight: radius, transform: nil) }
         ctx.saveGState()
         ctx.addRect(bounds)
-        if let selection { ctx.addPath(CGPath(roundedRect: selection, cornerWidth: 3, cornerHeight: 3, transform: nil)) }
-        ctx.setFillColor(NSColor.black.withAlphaComponent(selection == nil ? 0.18 : 0.42).cgColor)
+        if let selectionPath { ctx.addPath(selectionPath) }
+        ctx.setFillColor(NSColor.black.withAlphaComponent(selection == nil ? 0.12 : 0.34).cgColor)
         ctx.fillPath(using: .evenOdd)
         ctx.restoreGState()
 
-        guard let selection, !selection.isEmpty else { return }
-        let accent = NSColor(red: 0.04, green: 0.52, blue: 1, alpha: 1)
+        guard let selection, let selectionPath, !selection.isEmpty else { return }
+        // Thin white edge, lifted by a soft shadow, with a faint inner line for definition on light content.
         ctx.saveGState()
-        ctx.setFillColor(accent.withAlphaComponent(0.06).cgColor)
-        ctx.fill(selection)
-        ctx.addPath(CGPath(roundedRect: selection.insetBy(dx: -1, dy: -1), cornerWidth: 4, cornerHeight: 4, transform: nil))
-        ctx.setStrokeColor(accent.cgColor)
-        ctx.setLineWidth(2)
+        ctx.setShadow(offset: .zero, blur: 14, color: NSColor.black.withAlphaComponent(0.45).cgColor)
+        ctx.addPath(selectionPath)
+        ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.95).cgColor)
+        ctx.setLineWidth(1.5)
         ctx.strokePath()
         ctx.restoreGState()
+        let inner = selection.insetBy(dx: 1.5, dy: 1.5)
+        ctx.addPath(CGPath(roundedRect: inner, cornerWidth: max(radius - 1.5, 0), cornerHeight: max(radius - 1.5, 0), transform: nil))
+        ctx.setStrokeColor(NSColor.black.withAlphaComponent(0.18).cgColor)
+        ctx.setLineWidth(1)
+        ctx.strokePath()
 
         drawLabel(for: selection)
     }
 
+    /// A small dark pill under the selection: what it is and its size in pixels.
     private func drawLabel(for selection: CGRect) {
         let pixels = "\(Int((selection.width * frozen.scale).rounded())) × \(Int((selection.height * frozen.scale).rounded()))"
         let name = dragRect != nil ? nil : (regions.indices.contains(index) ? regions[index].label : nil)
         let text = NSMutableAttributedString()
         if let name {
-            text.append(NSAttributedString(string: name + "  ", attributes: [
-                .font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.white]))
+            text.append(NSAttributedString(string: name + "   ", attributes: [
+                .font: NSFont.systemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white.withAlphaComponent(0.7)]))
         }
         text.append(NSAttributedString(string: pixels, attributes: [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular),
-            .foregroundColor: NSColor.white.withAlphaComponent(0.8)]))
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold), .foregroundColor: NSColor.white]))
         let size = text.size()
-        var origin = CGPoint(x: selection.minX, y: selection.minY - size.height - 12)
-        if origin.y < 4 { origin.y = selection.minY + 6 }                 // no room above: tuck inside
-        origin.x = min(max(origin.x, 4), bounds.width - size.width - 20)
-        let pill = CGRect(x: origin.x, y: origin.y, width: size.width + 16, height: size.height + 6)
-        NSColor.black.withAlphaComponent(0.78).setFill()
-        NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
-        text.draw(at: CGPoint(x: pill.minX + 8, y: pill.minY + 3))
+        let pillSize = CGSize(width: size.width + 18, height: size.height + 8)
+        // Below the selection; above it if there's no room; inside the bottom edge as a last resort.
+        var origin = CGPoint(x: selection.minX, y: selection.maxY + 8)
+        if origin.y + pillSize.height > bounds.height - 70 {
+            origin.y = selection.minY - pillSize.height - 8
+            if origin.y < 6 { origin.y = selection.maxY - pillSize.height - 8 }
+        }
+        origin.x = min(max(origin.x, 6), bounds.width - pillSize.width - 6)
+        let pill = CGRect(origin: origin, size: pillSize)
+        let path = NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2)
+        NSColor.black.withAlphaComponent(0.62).setFill()
+        path.fill()
+        NSColor.white.withAlphaComponent(0.14).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+        text.draw(at: CGPoint(x: pill.minX + 9, y: pill.minY + 4))
     }
 }
 

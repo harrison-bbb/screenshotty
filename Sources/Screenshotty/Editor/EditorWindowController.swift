@@ -18,6 +18,7 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window.minSize = NSSize(width: 860, height: 560)
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
+        window.collectionBehavior = [.moveToActiveSpace]
         super.init(window: window)
 
         let actions = EditorActions(

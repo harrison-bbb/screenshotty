@@ -69,9 +69,15 @@ final class WindowManager {
         welcomeWindow?.close()
     }
 
+    /// Shows a window on the Space you're on. Every Screenshotty window moves to the active Space, so
+    /// activating the app never jumps you to another desktop where an older window happens to be.
     private func present(_ window: NSWindow) {
+        window.collectionBehavior.insert(.moveToActiveSpace)
+        for other in NSApp.windows where other.styleMask.contains(.titled) {
+            other.collectionBehavior.insert(.moveToActiveSpace)
+        }
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
