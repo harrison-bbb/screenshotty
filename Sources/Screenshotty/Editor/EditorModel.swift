@@ -61,6 +61,7 @@ final class EditorModel: ObservableObject {
                 settings.smartBackground = nil // no re-entry: Swift doesn't re-run didSet from inside it
             }
             Preferences.shared.lastSettings = settings
+            if case .image(let spec) = settings.background { Preferences.shared.rememberBackgroundImage(spec.path) }
             if settings.autoTrim != oldValue.autoTrim || settings.innerPadding != oldValue.innerPadding
                 || settings.effectiveCornerRadius != oldValue.effectiveCornerRadius {
                 updateShot()
@@ -102,6 +103,53 @@ final class EditorModel: ObservableObject {
     /// While true the canvas shows the capture exactly as taken, for comparison.
     @Published var showOriginal = false
 
+    // MARK: Sensitive info
+
+    enum ScanState { case scanning, done }
+    @Published private(set) var scanState: ScanState = .scanning
+    @Published private(set) var findings: [SensitiveFinding] = []
+    private var scanTask: Task<Void, Never>?
+
+    /// Findings not yet covered by a blur or redact annotation.
+    var visibleFindings: [SensitiveFinding] {
+        findings.filter { finding in
+            !annotations.contains { ($0.kind == .redact || $0.kind == .blur) && $0.rect.insetBy(dx: -2, dy: -2).contains(finding.rect) }
+        }
+    }
+
+    /// Covers every visible finding in one undoable step, with the user's preferred blur or bar.
+    func hideSensitive() {
+        let pending = visibleFindings
+        guard !pending.isEmpty else { return }
+        recordUndo()
+        annotations.append(contentsOf: pending.map { $0.annotation(Preferences.shared.sensitiveHideKind) })
+    }
+
+    private func scanForSensitiveInfo() {
+        scanTask?.cancel()
+        scanState = .scanning
+        findings = []
+        let image = source
+        scanTask = Task { [weak self] in
+            let found = await Task.detached(priority: .utility) { SensitiveScanner.scan(image) }.value
+            guard let self, !Task.isCancelled, image === self.source else { return }
+            self.findings = found
+            self.scanState = .done
+            if Preferences.shared.autoHideSensitive { self.hideSensitive() }
+        }
+    }
+
+    // MARK: Styles
+
+    func apply(_ style: Style) {
+        settings = style.settings.resolved(for: source)
+    }
+
+    /// The saved or built-in style the current look matches, if any.
+    var activeStyle: Style? {
+        Preferences.shared.allStyles.first { settings.looksLike($0.settings) }
+    }
+
     /// The screenshot after optional trimming and inner margin (without annotations).
     private(set) var prepared: PreparedShot
     private var analysis: ShotAnalysis?
@@ -117,6 +165,7 @@ final class EditorModel: ObservableObject {
         // A smart look from last time is re-matched to this screenshot.
         self.settings = settings.resolved(for: image)
         updateShot()
+        scanForSensitiveInfo()
     }
 
     private static func suggestions(for image: CGImage) -> [SmartSuggestion] {
@@ -132,12 +181,15 @@ final class EditorModel: ObservableObject {
 
     /// Whole-number enlargement applied on export so small captures stay sharp.
     var exportFactor: Int {
-        guard let minimum = Preferences.shared.exportMinimumLongSide else { return 1 }
+        guard settings.exportWidth == nil, let minimum = Preferences.shared.exportMinimumLongSide else { return 1 }
         return ExportScale.factor(for: layout.canvasSize, minimumLongSide: minimum)
     }
 
     var outputSize: CGSize {
         let canvas = layout.canvasSize
+        if let width = settings.exportWidth {
+            return ExportScale.size(forWidth: width, canvas: canvas, aspect: settings.aspectRatio)
+        }
         let factor = CGFloat(exportFactor)
         return CGSize(width: canvas.width * factor, height: canvas.height * factor)
     }
@@ -148,6 +200,7 @@ final class EditorModel: ObservableObject {
         if cleanedEdges { list.append("Edges cleaned") }
         if trimmedSomething { list.append(hasPlainBackground ? "Margins balanced" : "Margins trimmed") }
         if settings.smartBackground != nil { list.append("Colours matched") }
+        if scanState == .done, !findings.isEmpty, visibleFindings.isEmpty { list.append("Sensitive info hidden") }
         if exportFactor > 1 { list.append("Sharpened \(exportFactor)×") }
         return list
     }
@@ -165,6 +218,7 @@ final class EditorModel: ObservableObject {
         annotations = []
         selectedID = nil
         updateShot()
+        scanForSensitiveInfo()
     }
 
     func resetStyle() {
@@ -198,6 +252,12 @@ final class EditorModel: ObservableObject {
 
     func annotation(at point: CGPoint, tolerance: CGFloat) -> Annotation? {
         annotations.last { $0.hitTest(point, tolerance: tolerance) }
+    }
+
+    /// Annotations carried over from the quick preview (e.g. sensitive info it already hid).
+    func preload(_ marks: [Annotation]) {
+        guard !marks.isEmpty else { return }
+        annotations = marks
     }
 
     func add(_ annotation: Annotation) {

@@ -43,6 +43,42 @@ final class Preferences: ObservableObject {
 
     var exportMinimumLongSide: CGFloat? { upscaleSmallShots ? ExportScale.defaultMinimumLongSide : nil }
 
+    /// Hide emails, API keys and similar automatically on every capture. Sticks once turned on.
+    @Published var autoHideSensitive: Bool {
+        didSet { defaults.set(autoHideSensitive, forKey: "autoHideSensitive") }
+    }
+
+    /// How sensitive info is hidden: a solid bar (`.redact`) or pixelation (`.blur`).
+    @Published var sensitiveHideKind: Annotation.Kind {
+        didSet { defaults.set(sensitiveHideKind.rawValue, forKey: "sensitiveHideKind") }
+    }
+
+    /// Styles the user saved, newest last.
+    @Published var savedStyles: [Style] {
+        didSet { saveJSON(savedStyles, key: "savedStyles") }
+    }
+
+    var allStyles: [Style] { Style.builtIn + savedStyles }
+
+    /// Background images used before (paths inside Application Support), most recent first.
+    @Published private(set) var recentBackgroundImages: [String] {
+        didSet { defaults.set(recentBackgroundImages, forKey: "recentBackgroundImages") }
+    }
+
+    static let maxRecentImages = 12
+
+    func rememberBackgroundImage(_ path: String) {
+        guard recentBackgroundImages.first != path else { return }
+        var list = recentBackgroundImages.filter { $0 != path }
+        list.insert(path, at: 0)
+        recentBackgroundImages = Array(list.prefix(Self.maxRecentImages))
+    }
+
+    func forgetBackgroundImage(_ path: String) {
+        // The file is kept: a saved style may still use it.
+        recentBackgroundImages.removeAll { $0 == path }
+    }
+
     @Published var saveFolder: URL {
         didSet { defaults.set(saveFolder.path, forKey: "saveFolder") }
     }
@@ -61,6 +97,12 @@ final class Preferences: ObservableObject {
         }
         afterCapture = defaults.string(forKey: "afterCapture").flatMap(AfterCaptureAction.init(rawValue:)) ?? .quickPreview
         upscaleSmallShots = defaults.object(forKey: "upscaleSmallShots") as? Bool ?? true
+        autoHideSensitive = defaults.bool(forKey: "autoHideSensitive")
+        sensitiveHideKind = defaults.string(forKey: "sensitiveHideKind").flatMap(Annotation.Kind.init(rawValue:))
+            .flatMap { $0 == .blur ? .blur : .redact } ?? .redact
+        savedStyles = Self.loadJSON([Style].self, key: "savedStyles", defaults: defaults) ?? []
+        recentBackgroundImages = (defaults.stringArray(forKey: "recentBackgroundImages") ?? [])
+            .filter { FileManager.default.fileExists(atPath: $0) }
         if let path = defaults.string(forKey: "saveFolder") {
             saveFolder = URL(fileURLWithPath: path, isDirectory: true)
         } else {

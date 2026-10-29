@@ -7,6 +7,10 @@ struct InspectorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                InspectorSection("Style") {
+                    StylePicker(model: model)
+                }
+
                 InspectorSection("Background") {
                     BackgroundPickerView(background: $model.settings.background,
                                          smartVariant: $model.settings.smartBackground,
@@ -17,6 +21,13 @@ struct InspectorView: View {
                     AspectRatioGrid(selection: $model.settings.aspectRatio)
                     LabeledSlider(title: "Padding", value: $model.settings.padding,
                                   range: CompositionSettings.paddingRange)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Export width").font(.callout)
+                        CompactTabBar(selection: $model.settings.exportWidth,
+                                      options: CompositionSettings.exportWidthOptions,
+                                      title: \.exportWidthTitle)
+                    }
+                    .help("Exact width of the exported image. Original keeps the screenshot's own resolution.")
                 }
 
                 InspectorSection("Screenshot") {
@@ -30,10 +41,15 @@ struct InspectorView: View {
                                   ? "Even space around the content, in the screenshot's own background colour"
                                   : "Only applies to screenshots with a plain background, such as text")
                     }
-                    CornerRadiusControl(settings: $model.settings)
+                    if model.settings.device == .none {
+                        CornerRadiusControl(settings: $model.settings)
+                    }
                     LabeledPicker(title: "Shadow", selection: $model.settings.shadow)
-                    LabeledPicker(title: "Window", selection: $model.settings.windowChrome)
-                    LabeledPicker(title: "Frame", selection: $model.settings.frame)
+                    WindowControl(settings: $model.settings)
+                    LabeledPicker(title: "Mockup", selection: $model.settings.device)
+                    if model.settings.device == .none {
+                        LabeledPicker(title: "Frame", selection: $model.settings.frame)
+                    }
                 }
 
                 Button("Reset to Defaults") { model.resetStyle() }
@@ -95,7 +111,40 @@ protocol TitledOption: CaseIterable, Identifiable, Hashable where AllCases: Rand
 }
 
 extension ShadowStyle: TitledOption {}
-extension WindowChromeStyle: TitledOption {}
+extension DeviceStyle: TitledOption {}
+
+extension Optional where Wrapped == Int {
+    var exportWidthTitle: String { map { "\($0)" } ?? "Original" }
+}
+
+/// Window chrome: none, a macOS title bar, or a browser with an address bar, in light or dark.
+struct WindowControl: View {
+    @Binding var settings: CompositionSettings
+
+    var body: some View {
+        let chrome = settings.windowChrome
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Window").font(.callout)
+            CompactTabBar(selection: Binding(get: { chrome.kind },
+                                             set: { settings.windowChrome = WindowChromeStyle(kind: $0, dark: chrome.isDark) }),
+                          options: WindowChromeStyle.Kind.allCases, title: \.title)
+            if chrome.kind != .none {
+                CompactTabBar(selection: Binding(get: { chrome.isDark },
+                                                 set: { settings.windowChrome = WindowChromeStyle(kind: chrome.kind, dark: $0) }),
+                              options: [false, true], title: \.appearanceTitle)
+            }
+            if chrome.kind == .browser {
+                TextField("Address, e.g. yourapp.com", text: $settings.browserURL)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.callout)
+            }
+        }
+    }
+}
+
+private extension Bool {
+    var appearanceTitle: String { self ? "Dark" : "Light" }
+}
 extension FrameStyle: TitledOption {}
 
 struct LabeledPicker<Option: TitledOption>: View {

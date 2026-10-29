@@ -84,6 +84,12 @@ private struct CanvasView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.top, 40)
 
+                if !model.showOriginal {
+                    SensitiveBanner(model: model)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 10)
+                }
+
                 if isDropTarget {
                     RoundedRectangle(cornerRadius: 12)
                         .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [8]))
@@ -171,6 +177,53 @@ struct Checkerboard: View {
             }
         }
         .background(Color.white)
+    }
+}
+
+/// Warns about emails, keys and similar in the capture, and hides them in one click.
+/// "Auto-hide" is remembered, so every later capture is covered automatically.
+private struct SensitiveBanner: View {
+    @ObservedObject var model: EditorModel
+    @ObservedObject private var prefs = Preferences.shared
+
+    var body: some View {
+        let visible = model.visibleFindings
+        if model.scanState == .done, !model.findings.isEmpty {
+            HStack(spacing: 10) {
+                if visible.isEmpty {
+                    Label("Hidden: \(SensitiveFinding.summary(model.findings))", systemImage: "checkmark.shield.fill")
+                        .foregroundStyle(.green)
+                } else {
+                    Label("Found \(SensitiveFinding.summary(visible))", systemImage: "exclamationmark.shield.fill")
+                        .foregroundStyle(.orange)
+                    Picker("", selection: $prefs.sensitiveHideKind) {
+                        Text("Bar").tag(Annotation.Kind.redact)
+                        Text("Blur").tag(Annotation.Kind.blur)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 96)
+                    .help("Cover with a solid bar (safest) or pixelate")
+                    Button("Hide") { model.hideSensitive() }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                }
+                Divider().frame(height: 16)
+                Toggle("Auto-hide", isOn: $prefs.autoHideSensitive)
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .help("Hide sensitive info automatically on every capture")
+            }
+            .font(.callout.weight(.medium))
+            .controlSize(.small)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1)))
+            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+            .onChange(of: prefs.autoHideSensitive) { _, on in if on { model.hideSensitive() } }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 }
 

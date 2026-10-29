@@ -14,6 +14,14 @@ public enum ExportScale {
         return min(maxFactor, Int((minimumLongSide / longSide).rounded(.up)))
     }
 
+    /// Output size for an exact export width. Fixed aspect ratios give exact heights (1920 at 16:9 is
+    /// 1920×1080), instead of inheriting a pixel of rounding from the canvas.
+    public static func size(forWidth width: Int, canvas: CGSize, aspect: AspectRatio) -> CGSize {
+        let w = CGFloat(width)
+        if let ratio = aspect.ratio { return CGSize(width: w, height: (w / CGFloat(ratio)).rounded()) }
+        return CGSize(width: w, height: (canvas.height * w / max(canvas.width, 1)).rounded())
+    }
+
     /// Enlarges by a whole factor with nearest-neighbour sampling: every pixel becomes a crisp block.
     public static func enlarge(_ image: CGImage, by factor: Int) -> CGImage? {
         guard factor > 1 else { return image }

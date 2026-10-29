@@ -12,10 +12,15 @@ public enum CompositorError: Error {
 public enum Compositor {
     /// Composes `source` (already trimmed if desired) using `settings`.
     /// - Parameter scale: Output scale relative to the source's pixel size (1 = full resolution).
-    public static func render(_ source: CGImage, settings: CompositionSettings, scale: CGFloat = 1) throws -> CGImage {
+    /// - Parameter pixelSize: Exact output size. The canvas is stretched to fit, so pass a size with
+    ///   (almost exactly) the canvas' shape. Overrides `scale`.
+    public static func render(_ source: CGImage, settings: CompositionSettings, scale: CGFloat = 1,
+                              pixelSize: CGSize? = nil) throws -> CGImage {
         let layout = CompositionLayout(imageSize: CGSize(width: source.width, height: source.height), settings: settings)
-        let pixelW = max(Int((layout.canvasSize.width * scale).rounded()), 1)
-        let pixelH = max(Int((layout.canvasSize.height * scale).rounded()), 1)
+        let pixelW = max(Int((pixelSize?.width ?? layout.canvasSize.width * scale).rounded()), 1)
+        let pixelH = max(Int((pixelSize?.height ?? layout.canvasSize.height * scale).rounded()), 1)
+        let scaleX = CGFloat(pixelW) / layout.canvasSize.width
+        let scaleY = CGFloat(pixelH) / layout.canvasSize.height
 
         guard let ctx = CGContext(data: nil, width: pixelW, height: pixelH, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -27,12 +32,18 @@ public enum Compositor {
 
         // Work in top-left-origin layout coordinates.
         ctx.translateBy(x: 0, y: CGFloat(pixelH))
-        ctx.scaleBy(x: scale, y: -scale)
+        ctx.scaleBy(x: scaleX, y: -scaleY)
 
         let canvas = CGRect(origin: .zero, size: layout.canvasSize)
-        BackgroundRenderer.draw(settings.background, in: ctx, rect: canvas, unit: layout.unit * scale)
-        drawFrame(settings.frame, layout: layout, in: ctx)
-        drawCard(source, settings: settings, layout: layout, in: ctx)
+        BackgroundRenderer.draw(settings.background, in: ctx, rect: canvas, unit: layout.unit * scaleX)
+        if let device = layout.device {
+            DeviceFrame.drawBody(settings.device, geometry: device, shadow: settings.shadow, unit: layout.unit, in: ctx)
+            drawCard(source, settings: settings, layout: layout, in: ctx, shadow: false)
+            DeviceFrame.drawOverlay(settings.device, geometry: device, screen: layout.cardRect, in: ctx)
+        } else {
+            drawFrame(settings.frame, layout: layout, in: ctx)
+            drawCard(source, settings: settings, layout: layout, in: ctx, shadow: true)
+        }
 
         guard let image = ctx.makeImage() else { throw CompositorError.contextCreationFailed }
         return image
@@ -59,6 +70,22 @@ public enum Compositor {
                                     minimumLongSide: CGFloat?) throws -> CGImage {
         var shot = prepared
         var marks = annotations
+        if let width = settings.exportWidth, width > 0 {
+            // Exact output width. Big enlargements first double the shot pixel-for-pixel so text stays sharp.
+            let canvas = CompositionLayout(imageSize: CGSize(width: prepared.image.width, height: prepared.image.height),
+                                           settings: settings).canvasSize
+            let factor = Int((CGFloat(width) / canvas.width).rounded(.down))
+            if factor >= 2, let enlarged = ExportScale.enlarge(prepared.image, by: min(factor, ExportScale.maxFactor)) {
+                let f = CGFloat(min(factor, ExportScale.maxFactor))
+                shot = PreparedShot(image: enlarged, offset: CGPoint(x: prepared.offset.x * f, y: prepared.offset.y * f))
+                marks = annotations.map { $0.scaled(by: f) }
+            }
+            let image = AnnotationRenderer.apply(marks, to: shot.image, offset: shot.offset)
+            let finalCanvas = CompositionLayout(imageSize: CGSize(width: image.width, height: image.height),
+                                                settings: settings).canvasSize
+            return try render(image, settings: settings, pixelSize: ExportScale.size(forWidth: width, canvas: finalCanvas,
+                                                                                    aspect: settings.aspectRatio))
+        }
         if let minimumLongSide {
             let layout = CompositionLayout(imageSize: CGSize(width: prepared.image.width, height: prepared.image.height),
                                            settings: settings)
@@ -92,13 +119,14 @@ public enum Compositor {
         ctx.restoreGState()
     }
 
-    private static func drawCard(_ source: CGImage, settings: CompositionSettings, layout: CompositionLayout, in ctx: CGContext) {
+    private static func drawCard(_ source: CGImage, settings: CompositionSettings, layout: CompositionLayout,
+                                 in ctx: CGContext, shadow drawsShadow: Bool) {
         let card = layout.cardRect
         let cardPath = CGPath(roundedRect: card, cornerWidth: layout.cornerRadius,
                               cornerHeight: layout.cornerRadius, transform: nil)
 
         ctx.saveGState()
-        if let shadow = settings.shadow.parameters {
+        if drawsShadow, let shadow = settings.shadow.parameters {
             // Layout space is flipped, and CG shadow offsets ignore the CTM, so y is negated in device space.
             let scale = ctx.ctm.a
             ctx.setShadow(offset: CGSize(width: 0, height: -shadow.offsetY * layout.unit * scale),
@@ -112,13 +140,13 @@ public enum Compositor {
         if settings.windowChrome != .none {
             WindowChrome.draw(settings.windowChrome, in: ctx, rect: CGRect(x: card.minX, y: card.minY,
                                                                          width: card.width, height: layout.titleBarHeight),
-                              unit: layout.unit, cornerRadius: layout.cornerRadius)
+                              unit: layout.unit, cornerRadius: layout.cornerRadius, url: settings.browserURL)
         }
         drawImage(source, in: layout.imageRect, ctx: ctx)
         ctx.endTransparencyLayer()
         ctx.restoreGState()
 
-        if settings.frame == .hairline {
+        if settings.frame == .hairline, layout.device == nil {
             ctx.saveGState()
             let inset = max(layout.unit, 1) / 2
             ctx.addPath(CGPath(roundedRect: card.insetBy(dx: inset, dy: inset),

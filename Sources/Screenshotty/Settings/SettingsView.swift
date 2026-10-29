@@ -1,5 +1,6 @@
 import AppKit
 import ServiceManagement
+import ScreenshottyCore
 import SwiftUI
 
 struct SettingsView: View {
@@ -15,6 +16,12 @@ struct SettingsView: View {
                 }
                 Picker("After capturing", selection: $prefs.afterCapture) {
                     ForEach(AfterCaptureAction.allCases) { Text($0.title).tag($0) }
+                }
+                Toggle("Hide sensitive info automatically", isOn: $prefs.autoHideSensitive)
+                    .help("Emails, API keys, tokens, card and phone numbers and IP addresses are found on this Mac and covered on every capture")
+                Picker("Hide sensitive info with", selection: $prefs.sensitiveHideKind) {
+                    Text("Solid bar").tag(Annotation.Kind.redact)
+                    Text("Blur").tag(Annotation.Kind.blur)
                 }
                 Toggle("Sharpen small screenshots", isOn: $prefs.upscaleSmallShots)
                     .help("Small captures are enlarged pixel-for-pixel on export, so they stay crisp after X, LinkedIn or Slack resize them")

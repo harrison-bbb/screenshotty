@@ -11,8 +11,9 @@ final class WindowManager {
     private var settingsWindow: NSWindow?
     private var welcomeWindow: NSWindow?
 
-    func openEditor(with image: CGImage) {
+    func openEditor(with image: CGImage, annotations: [Annotation] = []) {
         let controller = EditorWindowController(image: image)
+        controller.model.preload(annotations)
         controller.onClose = { [weak self, weak controller] in
             self?.editors.removeAll { $0 === controller }
         }

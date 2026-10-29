@@ -63,7 +63,12 @@ final class QuickPreviewItem: ObservableObject {
     let settings: CompositionSettings
     @Published var thumbnail: CGImage?
     @Published var copied = false
+    /// Sensitive info found in the capture, and whether it's been covered.
+    @Published var findings: [SensitiveFinding] = []
+    @Published var hidden = false
     var onDismiss: (() -> Void)?
+    private var annotations: [Annotation] = []
+    private var scanTask: Task<Void, Never>?
 
     private(set) var panel: NSPanel!
     private var hideWork: DispatchWorkItem?
@@ -96,36 +101,65 @@ final class QuickPreviewItem: ObservableObject {
         panel.contentView = host
         self.panel = panel
 
-        renderThumbnail(maxSide: (width - 20) * 2)
+        renderThumbnail()
         scheduleHide()
+        scan()
     }
 
-    private func renderThumbnail(maxSide: CGFloat) {
+    private func renderThumbnail(maxSide: CGFloat = 520) {
         let source = source
         let settings = settings
+        let annotations = annotations
         Task { [weak self] in
             let image = await Task.detached(priority: .userInitiated) { () -> CGImage? in
                 let prepared = ShotPreparer.prepareShot(source, settings: settings)
-                let layout = CompositionLayout(imageSize: CGSize(width: prepared.image.width, height: prepared.image.height),
-                                               settings: settings)
+                let shot = AnnotationRenderer.apply(annotations, to: prepared.image, offset: prepared.offset)
+                let layout = CompositionLayout(imageSize: CGSize(width: shot.width, height: shot.height), settings: settings)
                 let scale = min(1, maxSide / max(layout.canvasSize.width, layout.canvasSize.height))
-                return try? Compositor.render(prepared.image, settings: settings, scale: scale)
+                return try? Compositor.render(shot, settings: settings, scale: scale)
             }.value
             self?.thumbnail = image
         }
     }
 
+    private func scan() {
+        let source = source
+        scanTask = Task { [weak self] in
+            let found = await Task.detached(priority: .userInitiated) { SensitiveScanner.scan(source) }.value
+            guard let self else { return }
+            self.findings = found
+            if Preferences.shared.autoHideSensitive, !found.isEmpty { self.hideSensitive() }
+        }
+    }
+
+    func hideSensitive() {
+        guard !findings.isEmpty, !hidden else { return }
+        annotations = findings.map { $0.annotation(Preferences.shared.sensitiveHideKind) }
+        hidden = true
+        finished = nil
+        renderThumbnail()
+    }
+
+    /// With auto-hide on, waits for the scan so nothing sensitive is copied or saved by accident.
+    private func whenSafe(_ action: @escaping @MainActor () -> Void) {
+        guard Preferences.shared.autoHideSensitive, let scanTask else { action(); return }
+        Task { await scanTask.value; action() }
+    }
+
     /// The full-resolution result, made once and reused.
     func finishedImage() -> CGImage? {
         if let finished { return finished }
-        finished = try? Compositor.compose(source, settings: settings,
+        finished = try? Compositor.compose(source, settings: settings, annotations: annotations,
                                            minimumLongSide: Preferences.shared.exportMinimumLongSide)
         return finished
     }
 
     // MARK: Actions
 
-    func copy() {
+    func copy() { whenSafe { self.performCopy() } }
+    func save() { whenSafe { self.performSave() } }
+
+    private func performCopy() {
         guard let image = finishedImage() else { return }
         Exporter.copyToPasteboard(image)
         copied = true
@@ -133,7 +167,7 @@ final class QuickPreviewItem: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.dismiss() }
     }
 
-    func save() {
+    private func performSave() {
         guard let image = finishedImage() else { return }
         do {
             let url = try Exporter.save(image, in: Preferences.shared.saveFolder)
@@ -146,7 +180,7 @@ final class QuickPreviewItem: ObservableObject {
     }
 
     func edit() {
-        WindowManager.shared.openEditor(with: source)
+        WindowManager.shared.openEditor(with: source, annotations: annotations)
         dismiss()
     }
 
@@ -196,6 +230,32 @@ private final class FirstClickHostingView<Content: View>: NSHostingView<Content>
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
+/// "1 API key · Hide" on the thumbnail, or a confirmation once hidden.
+private struct SensitivePill: View {
+    @ObservedObject var item: QuickPreviewItem
+
+    var body: some View {
+        Group {
+            if item.hidden {
+                Label("Hid \(SensitiveFinding.summary(item.findings))", systemImage: "checkmark.shield.fill")
+                    .foregroundStyle(.green)
+            } else {
+                Button { item.hideSensitive() } label: {
+                    Label("\(SensitiveFinding.summary(item.findings)) · Hide", systemImage: "exclamationmark.shield.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.orange)
+                .help("Cover sensitive info before copying or saving")
+            }
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(.regularMaterial, in: Capsule())
+    }
+}
+
 private struct QuickPreviewView: View {
     @ObservedObject var item: QuickPreviewItem
     let thumbHeight: CGFloat
@@ -220,6 +280,12 @@ private struct QuickPreviewView: View {
                 .onTapGesture { item.edit() }
                 .onDrag { item.dragProvider() }
                 .help("Click to edit, or drag into any app")
+
+                if !item.findings.isEmpty, !item.copied {
+                    SensitivePill(item: item)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(8)
+                }
 
                 if item.copied {
                     Label("Copied", systemImage: "checkmark.circle.fill")

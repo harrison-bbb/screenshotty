@@ -77,8 +77,64 @@ public enum ShadowStyle: String, Codable, CaseIterable, Identifiable, Sendable {
 
 public enum WindowChromeStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     case none, light, dark
+    /// A browser window: traffic lights, back and forward buttons and an address bar.
+    case browserLight = "browser-light"
+    case browserDark = "browser-dark"
+
     public var id: String { rawValue }
-    public var title: String { rawValue.capitalized }
+
+    public var title: String {
+        switch self {
+        case .none: "None"
+        case .light: "Light"
+        case .dark: "Dark"
+        case .browserLight: "Browser"
+        case .browserDark: "Browser Dark"
+        }
+    }
+
+    public enum Kind: String, CaseIterable, Identifiable, Sendable {
+        case none, macOS, browser
+        public var id: String { rawValue }
+        public var title: String {
+            switch self {
+            case .none: "None"
+            case .macOS: "macOS"
+            case .browser: "Browser"
+            }
+        }
+    }
+
+    public var kind: Kind {
+        switch self {
+        case .none: .none
+        case .light, .dark: .macOS
+        case .browserLight, .browserDark: .browser
+        }
+    }
+
+    public var isDark: Bool { self == .dark || self == .browserDark }
+
+    public init(kind: Kind, dark: Bool) {
+        switch kind {
+        case .none: self = .none
+        case .macOS: self = dark ? .dark : .light
+        case .browser: self = dark ? .browserDark : .browserLight
+        }
+    }
+}
+
+/// A device drawn around the screenshot.
+public enum DeviceStyle: String, Codable, CaseIterable, Identifiable, Sendable {
+    case none, macbook, iphone
+    public var id: String { rawValue }
+    public var title: String {
+        switch self {
+        case .none: "None"
+        case .macbook: "MacBook"
+        case .iphone: "iPhone"
+        }
+    }
 }
 
 public enum FrameStyle: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -110,6 +166,12 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
     public var innerPadding: Double
     /// When set, the background is generated from each screenshot's own colours with this look.
     public var smartBackground: SmartBackground.Variant?
+    /// Text shown in the address bar of the browser window chrome (e.g. "screenshotty.app").
+    public var browserURL: String
+    /// A MacBook or iPhone drawn around the screenshot.
+    public var device: DeviceStyle
+    /// Exact width of the exported image in pixels. Nil exports at the screenshot's own resolution.
+    public var exportWidth: Int?
 
     public init(background: BackgroundStyle = Presets.defaultBackground,
                 aspectRatio: AspectRatio = .auto,
@@ -120,7 +182,10 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
                 frame: FrameStyle = .none,
                 autoTrim: Bool = true,
                 innerPadding: Double = 40,
-                smartBackground: SmartBackground.Variant? = .vibrant) {
+                smartBackground: SmartBackground.Variant? = .vibrant,
+                browserURL: String = "",
+                device: DeviceStyle = .none,
+                exportWidth: Int? = nil) {
         self.background = background
         self.aspectRatio = aspectRatio
         self.padding = padding
@@ -131,6 +196,9 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         self.autoTrim = autoTrim
         self.innerPadding = innerPadding
         self.smartBackground = smartBackground
+        self.browserURL = browserURL
+        self.device = device
+        self.exportWidth = exportWidth
     }
 
     /// These settings with the background resolved for `image` when a smart background is chosen.
@@ -155,11 +223,25 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         windowChrome == .none ? cornerRadius : min(cornerRadius, Self.maxChromeCornerRadius)
     }
     public static let innerPaddingRange: ClosedRange<Double> = 0...150
+    /// Export widths offered in the editor, in pixels (nil = the screenshot's own resolution).
+    public static let exportWidthOptions: [Int?] = [nil, 1080, 1200, 1600, 1920, 2400]
+
+    /// True when the two settings produce the same look. A smart background counts as equal whatever
+    /// colours it was resolved to, because those depend on the screenshot.
+    public func looksLike(_ other: CompositionSettings) -> Bool {
+        var a = self
+        var b = other
+        if a.smartBackground != nil, a.smartBackground == b.smartBackground {
+            a.background = .transparent
+            b.background = .transparent
+        }
+        return a == b
+    }
 
     // Tolerant decoding: missing keys fall back to defaults so old saved settings keep working.
     private enum CodingKeys: String, CodingKey {
         case background, aspectRatio, padding, cornerRadius, shadow, windowChrome, frame, autoTrim, innerPadding
-        case smartBackground
+        case smartBackground, browserURL, device, exportWidth
     }
 
     public init(from decoder: Decoder) throws {
@@ -175,5 +257,8 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         autoTrim = (try? c.decode(Bool.self, forKey: .autoTrim)) ?? d.autoTrim
         innerPadding = (try? c.decode(Double.self, forKey: .innerPadding)) ?? d.innerPadding
         smartBackground = try? c.decode(SmartBackground.Variant.self, forKey: .smartBackground)
+        browserURL = (try? c.decode(String.self, forKey: .browserURL)) ?? d.browserURL
+        device = (try? c.decode(DeviceStyle.self, forKey: .device)) ?? d.device
+        exportWidth = try? c.decode(Int.self, forKey: .exportWidth)
     }
 }

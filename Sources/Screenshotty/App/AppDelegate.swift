@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.write("launch \(Bundle.main.shortVersion) (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? "?")) permission=\(CaptureService.hasScreenRecordingPermission)")
         NSApp.mainMenu = MainMenu.build()
+        // Load the on-device text recognition model now, so the first sensitive-info check is quick.
+        Task.detached(priority: .utility) { SensitiveScanner.warmUp() }
         setUpStatusItem()
 
         HotKeyManager.shared.onTrigger = { [weak self] in self?.startCapture(.interactive) }
@@ -89,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(withTitle: "Open Image…", action: #selector(openImage), keyEquivalent: "")
         menu.addItem(withTitle: "Beautify Clipboard Image", action: #selector(beautifyClipboard), keyEquivalent: "")
+        menu.addItem(withTitle: "Batch Export…", action: #selector(batchExport), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         menu.addItem(withTitle: "Screenshotty on GitHub", action: #selector(openRepository), keyEquivalent: "")
@@ -177,11 +180,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             WindowManager.shared.openEditor(with: image)
         case .copy:
             guard let output = try? Compositor.compose(image, settings: prefs.lastSettings,
+                                                       annotations: Self.autoHideAnnotations(for: image),
                                                        minimumLongSide: prefs.exportMinimumLongSide) else { return }
             Exporter.copyToPasteboard(output)
             Toast.show("Copied to clipboard")
         case .save:
             guard let output = try? Compositor.compose(image, settings: prefs.lastSettings,
+                                                       annotations: Self.autoHideAnnotations(for: image),
                                                        minimumLongSide: prefs.exportMinimumLongSide) else { return }
             do {
                 let url = try Exporter.save(output, in: prefs.saveFolder)
@@ -190,6 +195,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 NSApp.activate(ignoringOtherApps: true)
                 NSAlert(error: error).runModal()
             }
+        }
+    }
+
+    /// Covers sensitive info when auto-hide is on (used by the paths that skip the editor).
+    static func autoHideAnnotations(for image: CGImage) -> [Annotation] {
+        let prefs = Preferences.shared
+        guard prefs.autoHideSensitive else { return [] }
+        return SensitiveScanner.scan(image).map { $0.annotation(prefs.sensitiveHideKind) }
+    }
+
+    // MARK: - Batch export
+
+    /// Applies one style to many images and saves them into a new folder.
+    @objc func batchExport() {
+        NSApp.activate(ignoringOtherApps: true)
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose the screenshots to export with one style"
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+        let urls = panel.urls
+
+        let alert = NSAlert()
+        alert.messageText = "Export \(urls.count) image\(urls.count == 1 ? "" : "s")"
+        alert.informativeText = prefs.autoHideSensitive
+            ? "Each image gets the style below. Sensitive info is hidden automatically."
+            : "Each image gets the style below."
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26), pullsDown: false)
+        popup.addItem(withTitle: "Current look")
+        for style in prefs.allStyles { popup.addItem(withTitle: style.name) }
+        alert.accessoryView = popup
+        alert.addButton(withTitle: "Export")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let settings = popup.indexOfSelectedItem == 0 ? prefs.lastSettings : prefs.allStyles[popup.indexOfSelectedItem - 1].settings
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        let folder = prefs.saveFolder.appendingPathComponent("Screenshotty Batch \(formatter.string(from: Date()))", isDirectory: true)
+        let autoHide = prefs.autoHideSensitive
+        let hideKind = prefs.sensitiveHideKind
+        let minimumLongSide = prefs.exportMinimumLongSide
+        Toast.show("Exporting \(urls.count) images…", systemImage: "square.stack.3d.up.fill")
+
+        Task {
+            let exported = await Task.detached(priority: .userInitiated) { () -> Int in
+                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                var count = 0
+                for url in urls {
+                    guard let image = ImageLoader.load(url) else { continue }
+                    let marks = autoHide ? SensitiveScanner.scan(image).map { $0.annotation(hideKind) } : []
+                    guard let output = try? Compositor.compose(image, settings: settings, annotations: marks,
+                                                               minimumLongSide: minimumLongSide) else { continue }
+                    let name = url.deletingPathExtension().lastPathComponent
+                    if (try? PNGEncoder.write(output, to: folder.appendingPathComponent(name).appendingPathExtension("png"))) != nil {
+                        count += 1
+                    }
+                }
+                return count
+            }.value
+            Toast.show("Exported \(exported) of \(urls.count) images")
+            NSWorkspace.shared.activateFileViewerSelecting([folder])
         }
     }
 
@@ -276,6 +344,7 @@ enum MainMenu {
         let full = file.addItem(withTitle: "Capture Full Screen", action: #selector(AppDelegate.captureFullScreen), keyEquivalent: "n")
         full.keyEquivalentModifierMask = [.command, .shift]
         file.addItem(withTitle: "Open Image…", action: #selector(AppDelegate.openImage), keyEquivalent: "o")
+        file.addItem(withTitle: "Batch Export…", action: #selector(AppDelegate.batchExport), keyEquivalent: "")
         file.addItem(.separator())
         file.addItem(withTitle: "Save", action: #selector(EditorWindowController.saveImage(_:)), keyEquivalent: "s")
         let saveAs = file.addItem(withTitle: "Save As…", action: #selector(EditorWindowController.saveImageAs(_:)), keyEquivalent: "s")

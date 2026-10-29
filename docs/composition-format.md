@@ -33,7 +33,10 @@ Every key is optional. Missing keys use the defaults shown above.
 | `padding` | 0 to 300 units |
 | `cornerRadius` | 0 to 60 units, clamped to half the shortest side. Capped at 24 while `windowChrome` is not `none`. |
 | `shadow` | `none`, `soft`, `medium`, `strong` |
-| `windowChrome` | `none`, `light`, `dark` |
+| `windowChrome` | `none`, `light`, `dark`, `browser-light`, `browser-dark` |
+| `browserURL` | Text shown in the browser address bar, with a padlock. Empty draws an empty bar. |
+| `device` | `none`, `macbook`, `iphone`. A device replaces the corner radius and `frame`. |
+| `exportWidth` | Optional exact width of the exported image in pixels. With a fixed `aspectRatio` the height is exact too (1920 at `16:9` is 1920×1080). |
 | `frame` | `none`, `hairline`, `glass` |
 | `autoTrim` | `true` or `false` |
 | `smartBackground` | Optional: `vibrant`, `mesh`, `pastel` or `dark`. When set, `background` is regenerated from each screenshot's colours (see below). |
@@ -57,10 +60,11 @@ Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
 2. Then look for a plain background. The candidate is the most common colour along the image edges. It counts as the background when it covers at least 70% of all edge pixels and at least 30% of each of the four edges, within a per-channel tolerance of 2. A transparent candidate means a window capture.
 3. Remove rows and columns at the edges that are entirely background.
 4. If the background is a colour (not transparent), add an even inner margin of that colour around the content: `innerPadding` units, and never less than half the corner radius, so rounded corners cannot clip the content.
-5. The card is the screenshot plus a 28-unit title bar when `windowChrome` is not `none`. Traffic lights are 12 units wide, 20 units apart, with the first centred 20 units from the left, moved right only if needed to stay inside the rounded corner.
-6. The minimum canvas is the card plus `padding` on each side, plus a 14-unit frame when `frame` is `glass`.
-7. For a fixed aspect ratio, the canvas grows along one axis until it matches. With `auto`, it grows only if needed to keep the shape between 4:5 and 2:1.
-8. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.
+5. The card is the screenshot plus a title bar: 28 units for `light` and `dark`, 46 units for the browser styles. Traffic lights are 12 units wide, 20 units apart, with the first centred 20 units from the left, moved right only if needed to stay inside the rounded corner.
+6. With a `device`, the card sits inside it. MacBook: a bezel of 3.2% of the card width (1.5× at the bottom), and a base 16% wider than the lid and 3.4% of its width tall. iPhone: a bezel of 4.5% of the card width, body corner radius 15.5% of its shortest side. The device (including the base) is what gets padded and centred.
+7. The minimum canvas is the card (or device) plus `padding` on each side, plus a 14-unit frame when `frame` is `glass`.
+8. For a fixed aspect ratio, the canvas grows along one axis until it matches. With `auto`, it grows only if needed to keep the shape between 4:5 and 2:1.
+9. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.
 
 On export, a result whose longest side is under 1600 px may be enlarged by the smallest whole factor (up to 4) that reaches it. The shot is enlarged with nearest-neighbour sampling so pixels stay sharp, then annotations and the composition are drawn at the new size.
 
@@ -84,3 +88,31 @@ Each look is built from those two hues in HSB:
 | `dark` | Base (h1, 0.55, 0.12) with glowing blobs (h1, 0.75, 0.55) and (h2, 0.75, 0.42) |
 
 The exact blob positions are in `Sources/ScreenshottyCore/SmartBackground.swift`.
+
+## Styles
+
+A style is a name plus settings: `{ "id": "…", "name": "X post", "settings": { … } }`. Built-in styles:
+
+| Style | Settings |
+| --- | --- |
+| X post | 16:9, 1600 px wide, vibrant smart background |
+| LinkedIn | 1.91:1, 1200 px wide, mesh smart background |
+| Instagram | 4:5, 1080 px wide, pastel smart background |
+| Launch | 16:9, 1920 px wide, light browser window, strong shadow |
+| Mobile app | 4:5, 1080 px wide, iPhone |
+| MacBook | 16:9, 1920 px wide, MacBook, dark smart background |
+| Docs | transparent, soft shadow, natural size |
+
+## Sensitive info
+
+Text is read on the device (Apple Vision, accurate mode, no language correction). Each line is matched
+against these patterns, first match wins, with no overlaps:
+
+- **Email:** `name@domain.tld`.
+- **Token:** JSON Web Tokens (`eyJ…`.`…`.`…`).
+- **API key:** well-known prefixes (`sk_`, `pk_`, `rk_`, `sk-`, `ghp_`, `github_pat_`, `AKIA`, `xoxb-`, `AIza`, `glpat-`, `whsec_` and more), or any 32+ character string mixing upper case, lower case and at least 3 digits.
+- **Card number:** 13 to 19 digits that pass the Luhn check.
+- **Phone number:** `(415) 555-0132`, `415-555-0132` and international `+44 20 7946 0958` forms.
+- **IP address:** IPv4.
+
+Each match's box is padded by a quarter of its height and covered with a `redact` or `blur` annotation.

@@ -144,6 +144,12 @@ struct BackgroundPickerView: View {
                 Button("Use Desktop Wallpaper", action: useWallpaper)
             }
             .controlSize(.small)
+            RecentImagesGrid(current: currentImagePath) { path in
+                let spec = ImageBackgroundSpec(path: path, blur: lastImage?.blur ?? 0)
+                lastImage = spec
+                background = .image(spec)
+                Preferences.shared.rememberBackgroundImage(path)
+            }
         }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             guard let provider = providers.first else { return false }
@@ -235,15 +241,75 @@ struct BackgroundPickerView: View {
         setImage(url)
     }
 
-    /// Copies the image into Application Support so the background keeps working later.
+    private var currentImagePath: String? {
+        if case .image(let spec) = background { return spec.path }
+        return nil
+    }
+
+    /// Copies the image into Application Support so the background keeps working later, and remembers
+    /// it so it's one click away next time. Picking the same picture again reuses the earlier copy.
     private func setImage(_ url: URL) {
         guard ImageLoader.load(url) != nil else { return }
-        let destination = Preferences.backgroundsFolder
-            .appendingPathComponent(UUID().uuidString)
-            .appendingPathExtension(url.pathExtension.isEmpty ? "png" : url.pathExtension)
-        let path = (try? FileManager.default.copyItem(at: url, to: destination)) != nil ? destination.path : url.path
+        let prefs = Preferences.shared
+        let path: String
+        if url.path.hasPrefix(Preferences.backgroundsFolder.path) {
+            path = url.path
+        } else if let existing = prefs.recentBackgroundImages.first(where: {
+            FileManager.default.contentsEqual(atPath: $0, andPath: url.path)
+        }) {
+            path = existing
+        } else {
+            let destination = Preferences.backgroundsFolder
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension(url.pathExtension.isEmpty ? "png" : url.pathExtension)
+            path = (try? FileManager.default.copyItem(at: url, to: destination)) != nil ? destination.path : url.path
+        }
         let spec = ImageBackgroundSpec(path: path, blur: lastImage?.blur ?? 0)
         lastImage = spec
         background = .image(spec)
+        prefs.rememberBackgroundImage(path)
+    }
+}
+
+/// Background images used before, so a favourite is one click away.
+private struct RecentImagesGrid: View {
+    @ObservedObject private var prefs = Preferences.shared
+    let current: String?
+    let select: (String) -> Void
+
+    var body: some View {
+        if !prefs.recentBackgroundImages.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Recent")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
+                    ForEach(prefs.recentBackgroundImages, id: \.self) { path in
+                        Button { select(path) } label: {
+                            Group {
+                                if let thumb = ThumbnailCache.shared.image(for: .image(ImageBackgroundSpec(path: path)),
+                                                                           key: "image:\(path)",
+                                                                           size: CGSize(width: 120, height: 80)) {
+                                    Image(decorative: thumb, scale: 1).resizable().aspectRatio(contentMode: .fill)
+                                } else {
+                                    Color.secondary.opacity(0.2)
+                                }
+                            }
+                            .frame(height: 40)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(current == path ? Color.accentColor : Color.primary.opacity(0.1),
+                                              lineWidth: current == path ? 2 : 1))
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Remove from Recent") { prefs.forgetBackgroundImage(path) }
+                        }
+                    }
+                }
+            }
+            .padding(.top, 4)
+        }
     }
 }

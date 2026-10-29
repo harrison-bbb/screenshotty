@@ -12,6 +12,7 @@ enum CLI {
         var output: String?
         var settings = CompositionSettings.default
         var upscale = true
+        var redact = false
         var i = 0
 
         func value() -> String? {
@@ -63,6 +64,24 @@ enum CLI {
             case "--chrome":
                 guard let v = value().flatMap(WindowChromeStyle.init(rawValue:)) else { return fail("Invalid chrome") }
                 settings.windowChrome = v
+            case "--url":
+                guard let v = value() else { return fail("Missing URL") }
+                settings.browserURL = v
+            case "--device":
+                guard let v = value().flatMap(DeviceStyle.init(rawValue:)) else {
+                    return fail("Unknown device. Available: \(DeviceStyle.allCases.map(\.rawValue).joined(separator: ", "))")
+                }
+                settings.device = v
+            case "--width":
+                guard let v = value().flatMap(Int.init), v >= 100, v <= 8000 else { return fail("Width must be 100 to 8000 pixels") }
+                settings.exportWidth = v
+            case "--style":
+                guard let id = value(), let style = Style.builtIn.first(where: { $0.id == "builtin." + id || $0.id == id }) else {
+                    return fail("Unknown style. Available: \(Style.builtIn.map { String($0.id.dropFirst(8)) }.joined(separator: ", "))")
+                }
+                settings = style.settings
+            case "--redact":
+                redact = true
             case "--frame":
                 guard let v = value().flatMap(FrameStyle.init(rawValue:)) else { return fail("Invalid frame") }
                 settings.frame = v
@@ -85,7 +104,13 @@ enum CLI {
         guard let image = ImageLoader.load(URL(fileURLWithPath: input)) else { return fail("Could not read \(input)") }
         let outPath = output ?? (input as NSString).deletingPathExtension + "-screenshotty.png"
         do {
-            let result = try Compositor.compose(image, settings: settings,
+            var annotations: [Annotation] = []
+            if redact {
+                let findings = SensitiveScanner.scan(image)
+                annotations = findings.map(\.redaction)
+                for finding in findings { print("Redacted \(finding.kind.singularTitle): \(finding.masked)") }
+            }
+            let result = try Compositor.compose(image, settings: settings, annotations: annotations,
                                                minimumLongSide: upscale ? ExportScale.defaultMinimumLongSide : nil)
             try PNGEncoder.write(result, to: URL(fileURLWithPath: outPath))
             print("\(outPath) (\(result.width)×\(result.height))")
@@ -112,7 +137,12 @@ enum CLI {
       --padding <units>    Padding, in 1/1000ths of the screenshot's longest side (default 90)
       --radius <units>     Corner radius (default 12)
       --shadow <style>     none, soft, medium, strong
-      --chrome <style>     none, light, dark
+      --chrome <style>     none, light, dark, browser-light, browser-dark
+      --url <text>         Address shown in the browser window chrome
+      --device <name>      none, macbook, iphone
+      --width <pixels>     Exact export width (height follows the canvas shape)
+      --style <id>         A built-in style: \(Style.builtIn.map { String($0.id.dropFirst(8)) }.joined(separator: ", "))
+      --redact             Find emails, API keys, card numbers and similar, and cover them before export
       --frame <style>      none, hairline, glass
       --inner <units>      Even inner margin for screenshots on a plain background (default 40)
       --no-trim            Keep the screenshot exactly as captured (also keeps sloppy edges)
