@@ -30,12 +30,40 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         window.delegate = self
         window.setFrameAutosaveName("EditorWindow")
         if !window.setFrameUsingName("EditorWindow") { window.center() }
+
+        // Esc steps back one level: out of a crop or a label being typed, then deselects, then closes.
+        escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53, let self, let window = self.window, event.window === window else { return event }
+            return MainActor.assumeIsolated { self.handleEscape() } ? nil : event
+        }
+    }
+
+    private var escapeMonitor: Any?
+
+    /// Returns true when Esc was used.
+    @MainActor private func handleEscape() -> Bool {
+        if model.tool == .crop { return false }          // the crop tool's own Cancel handles it
+        if model.textEditing != nil { model.cancelText(); return true }
+        if window?.firstResponder is NSText { window?.makeFirstResponder(nil); return true }
+        if model.selectedID != nil { model.select(nil); return true }
+        window?.performClose(nil)
+        return true
+    }
+
+    /// Copies the finished image and closes the editor: the quickest way out (⌘↩).
+    @MainActor @objc func copyAndClose(_ sender: Any?) {
+        guard let image = render() else { return }
+        Exporter.copyToPasteboard(image)
+        Toast.show("Copied to clipboard")
+        window?.performClose(nil)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
     func windowWillClose(_ notification: Notification) {
+        if let escapeMonitor { NSEvent.removeMonitor(escapeMonitor) }
+        escapeMonitor = nil
         onClose?()
     }
 

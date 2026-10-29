@@ -7,12 +7,32 @@ struct SettingsView: View {
     @ObservedObject private var prefs = Preferences.shared
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var hasPermission = CaptureService.hasScreenRecordingPermission
+    @State private var axTrusted = AXIsProcessTrusted()
 
     var body: some View {
         Form {
             Section("Capture") {
                 LabeledContent("Global shortcut") {
                     HotKeyRecorder(hotKey: $prefs.hotKey)
+                }
+                Picker("Selecting an area", selection: $prefs.captureStyle) {
+                    ForEach(CaptureStyle.allCases) { Text($0.title).tag($0) }
+                }
+                if prefs.captureStyle == .smart {
+                    LabeledContent("Element detection") {
+                        HStack {
+                            Label(axTrusted ? "On" : "Text blocks and windows only",
+                                  systemImage: axTrusted ? "checkmark.circle.fill" : "info.circle")
+                                .foregroundStyle(axTrusted ? .green : .secondary)
+                            if !axTrusted {
+                                Button("Turn On") {
+                                    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                                    axTrusted = AXIsProcessTrustedWithOptions(options)
+                                }
+                                .help("Accessibility permission lets the picker find buttons, panels and paragraphs inside apps")
+                            }
+                        }
+                    }
                 }
                 Picker("After capturing", selection: $prefs.afterCapture) {
                     ForEach(AfterCaptureAction.allCases) { Text($0.title).tag($0) }
@@ -107,6 +127,7 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             hasPermission = CaptureService.hasScreenRecordingPermission
+            axTrusted = AXIsProcessTrusted()
         }
     }
 

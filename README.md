@@ -20,7 +20,7 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 
 ## Features
 
-- **Capture with one shortcut.** Press <kbd>⌘</kbd><kbd>⇧</kbd><kbd>2</kbd> and select an area. Press <kbd>Space</kbd> to pick a window. It is the same picker as the built-in screenshot tool.
+- **Smart selection.** Press <kbd>⌘</kbd><kbd>⇧</kbd><kbd>2</kbd>: the screen freezes and the selection locks onto what's under your pointer: a paragraph, a panel, a button, a whole window. Click to capture it, scroll (or <kbd>↑</kbd> <kbd>↓</kbd>) for a bigger or smaller element, or drag your own area, which snaps to nearby edges. <kbd>Space</kbd> picks whole windows. With Accessibility permission it finds individual interface elements; without it, text blocks and windows. Prefer the macOS picker? Switch in Settings.
 - **Built for teams.** A brand kit (logo, name, colours) puts a watermark on every image. Share any style as a
   `.screenshotty-style` file, or point everyone at a shared folder of team styles. Save `.screenshotty` projects
   that reopen with the crop, annotations and style still editable, so docs screenshots are easy to update.
@@ -98,7 +98,10 @@ Diagnostics are written to `~/Library/Logs/Screenshotty.log`. Please attach it w
 | Action | Shortcut |
 | --- | --- |
 | Capture area or window (global) | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>2</kbd> (change it in Settings) |
+| While selecting | Click to capture · drag for an area · scroll or <kbd>↑</kbd> <kbd>↓</kbd> to resize · <kbd>Space</kbd> windows · <kbd>Esc</kbd> cancel |
 | Copy image | <kbd>⌘</kbd><kbd>C</kbd> |
+| Copy and close the editor | <kbd>⌘</kbd><kbd>↩</kbd> |
+| Close the editor | <kbd>Esc</kbd> (backs out of a crop or label first) |
 | Save to your save folder | <kbd>⌘</kbd><kbd>S</kbd> |
 | Save as | <kbd>⌘</kbd><kbd>⇧</kbd><kbd>S</kbd> |
 | Replace screenshot from clipboard | <kbd>⌘</kbd><kbd>V</kbd> |

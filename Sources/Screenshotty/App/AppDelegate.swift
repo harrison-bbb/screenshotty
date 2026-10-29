@@ -19,7 +19,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Log.write("launch \(Bundle.main.shortVersion) (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? "?")) permission=\(CaptureService.hasScreenRecordingPermission)")
         NSApp.mainMenu = MainMenu.build()
         // Load the on-device text recognition model now, so the first sensitive-info check is quick.
-        Task.detached(priority: .utility) { SensitiveScanner.warmUp() }
+        Task.detached(priority: .utility) {
+            SensitiveScanner.warmUp()
+            RegionDetector.warmUp()
+        }
         setUpStatusItem()
 
         HotKeyManager.shared.onTrigger = { [weak self] in self?.startCapture(.interactive) }
@@ -198,7 +201,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         isCapturing = true
         Task { @MainActor in
             defer { isCapturing = false }
-            switch await CaptureService.capture(mode) {
+            // Smart selection when chosen; the system picker if it's off or can't start.
+            var result: CaptureResult?
+            if mode == .interactive, prefs.captureStyle == .smart {
+                result = await SmartCapture.run()
+                if result == nil { Log.write("smart capture unavailable, using the system picker") }
+            }
+            switch await result.asyncOr({ await CaptureService.capture(mode) }) {
             case .image(let image): handleCaptured(image)
             case .cancelled: break
             case .blocked: showCaptureBlockedAlert()
@@ -295,5 +304,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         default:
             return false
         }
+    }
+}
+
+private extension Optional {
+    func asyncOr(_ fallback: () async -> Wrapped) async -> Wrapped {
+        if let self { return self }
+        return await fallback()
     }
 }

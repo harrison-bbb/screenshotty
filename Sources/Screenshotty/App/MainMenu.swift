@@ -42,6 +42,7 @@ enum MainMenu {
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
         edit.addItem(withTitle: "Copy Image", action: #selector(EditorWindowController.copyImage(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Copy and Close", action: #selector(EditorWindowController.copyAndClose(_:)), keyEquivalent: "\r")
         edit.addItem(withTitle: "Paste Image", action: #selector(EditorWindowController.pasteImage(_:)), keyEquivalent: "v")
         let delete = edit.addItem(withTitle: "Delete Annotation", action: #selector(EditorWindowController.deleteAnnotation(_:)),
                                   keyEquivalent: String(UnicodeScalar(NSBackspaceCharacter)!))

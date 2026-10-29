@@ -15,6 +15,20 @@ enum AfterCaptureAction: String, CaseIterable, Identifiable {
     }
 }
 
+enum CaptureStyle: String, CaseIterable, Identifiable {
+    /// Screenshotty's picker: locks onto elements, text blocks and windows.
+    case smart
+    /// macOS's own ⌘⇧4 picker.
+    case system
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .smart: "Smart selection (locks onto elements)"
+        case .system: "macOS picker"
+        }
+    }
+}
+
 /// User preferences, persisted in UserDefaults.
 @MainActor
 final class Preferences: ObservableObject {
@@ -30,6 +44,10 @@ final class Preferences: ObservableObject {
         didSet {
             if let hotKey { saveJSON(hotKey, key: "hotKey") } else { defaults.set("none", forKey: "hotKey") }
         }
+    }
+
+    @Published var captureStyle: CaptureStyle {
+        didSet { defaults.set(captureStyle.rawValue, forKey: "captureStyle") }
     }
 
     @Published var afterCapture: AfterCaptureAction {
@@ -183,6 +201,7 @@ final class Preferences: ObservableObject {
         }
         afterCapture = defaults.string(forKey: "afterCapture").flatMap(AfterCaptureAction.init(rawValue:)) ?? .openEditor
         upscaleSmallShots = defaults.object(forKey: "upscaleSmallShots") as? Bool ?? true
+        captureStyle = defaults.string(forKey: "captureStyle").flatMap(CaptureStyle.init(rawValue:)) ?? .smart
         autoHideSensitive = defaults.bool(forKey: "autoHideSensitive")
         sensitiveHideKind = defaults.string(forKey: "sensitiveHideKind").flatMap(Annotation.Kind.init(rawValue:))
             .flatMap { $0 == .blur ? .blur : .redact } ?? .redact

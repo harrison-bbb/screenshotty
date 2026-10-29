@@ -160,7 +160,7 @@ private struct ActionBar: View {
                 Label("Copy", systemImage: "doc.on.doc")
             }
             .buttonStyle(.borderedProminent)
-            .help("Copy the finished image (⌘C)")
+            .help("Copy the finished image (⌘C). ⌘↩ copies and closes, Esc closes.")
         }
         .controlSize(.large)
         .padding(.horizontal, 16)
