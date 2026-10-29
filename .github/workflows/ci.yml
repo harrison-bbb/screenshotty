@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: Test
+        run: swift test
+      - name: Build app bundle
+        run: scripts/build-app.sh "0.0.0-ci"
+      - name: Smoke-test the CLI renderer
+        run: |
+          build/Screenshotty.app/Contents/MacOS/Screenshotty render Packaging/AppIcon.png -o /tmp/out.png --preset ocean --aspect 16:9
+          test -s /tmp/out.png

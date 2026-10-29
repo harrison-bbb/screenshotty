@@ -1,0 +1,195 @@
+import AppKit
+import ScreenshottyCore
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct BackgroundPickerView: View {
+    @Binding var background: BackgroundStyle
+    @State private var tab: Tab = .gradient
+    /// Remembers the last custom image so switching tabs doesn't lose it.
+    @State private var lastImage: ImageBackgroundSpec?
+
+    enum Tab: String, CaseIterable, Identifiable {
+        case gradient = "Gradient", wallpaper = "Mesh", solid = "Solid", image = "Image", none = "None"
+        var id: String { rawValue }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            CompactTabBar(selection: $tab, options: Tab.allCases, title: \.rawValue)
+                .onChange(of: tab) { _, newTab in switchKind(to: newTab) }
+
+            switch tab {
+            case .gradient: gradientPanel
+            case .wallpaper: presetGrid(Presets.wallpapers, columns: 4)
+            case .solid: solidPanel
+            case .image: imagePanel
+            case .none:
+                Text("No background. Exported PNGs keep transparency around the screenshot.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .onAppear {
+            tab = Self.tab(for: background)
+            if case .image(let spec) = background { lastImage = spec }
+        }
+    }
+
+    // MARK: Panels
+
+    private var gradientPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            presetGrid(Presets.gradients, columns: 4)
+            if case .linearGradient(let spec) = background {
+                LabeledSlider(title: "Angle", value: Binding(
+                    get: { spec.angle },
+                    set: { var s = spec; s.angle = $0.rounded(); background = .linearGradient(s) }),
+                    range: 0...360)
+            }
+        }
+    }
+
+    private var solidPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 6) {
+                ForEach(Presets.solids, id: \.self) { color in
+                    Button { background = .solid(color) } label: {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(color.swiftUIColor)
+                            .frame(height: 28)
+                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.12)))
+                            .overlay(selectionRing(background == .solid(color), radius: 6))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            ColorPicker("Custom colour", selection: Binding(
+                get: { if case .solid(let c) = background { c.swiftUIColor } else { .white } },
+                set: { background = .solid(RGBAColor($0)) }))
+                .font(.callout)
+        }
+    }
+
+    private var imagePanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if case .image(let spec) = background {
+                if let thumb = ThumbnailCache.shared.image(for: .image(ImageBackgroundSpec(path: spec.path)),
+                                                           key: "image:\(spec.path)") {
+                    Image(decorative: thumb, scale: 1)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 90)
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                LabeledSlider(title: "Blur", value: Binding(
+                    get: { spec.blur },
+                    set: { var s = spec; s.blur = $0.rounded(); background = .image(s); lastImage = s }),
+                    range: 0...100)
+            } else {
+                Text("Use any photo or wallpaper. Drop an image here or choose one.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Button("Choose Image…", action: chooseImage)
+                Button("Use Desktop Wallpaper", action: useWallpaper)
+            }
+            .controlSize(.small)
+        }
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            guard let provider = providers.first else { return false }
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url else { return }
+                Task { @MainActor in setImage(url) }
+            }
+            return true
+        }
+    }
+
+    // MARK: Helpers
+
+    private func presetGrid(_ presets: [BackgroundPreset], columns: Int) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: columns), spacing: 6) {
+            ForEach(presets) { preset in
+                Button { background = preset.style } label: {
+                    Group {
+                        if let thumb = ThumbnailCache.shared.image(for: preset.style, key: preset.id) {
+                            Image(decorative: thumb, scale: 1).resizable()
+                        } else {
+                            Color.gray
+                        }
+                    }
+                    .frame(height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .overlay(selectionRing(isSelected(preset), radius: 7))
+                }
+                .buttonStyle(.plain)
+                .help(preset.name)
+            }
+        }
+    }
+
+    private func isSelected(_ preset: BackgroundPreset) -> Bool {
+        switch (background, preset.style) {
+        case (.linearGradient(let a), .linearGradient(let b)): a.stops == b.stops
+        default: background == preset.style
+        }
+    }
+
+    private func selectionRing(_ selected: Bool, radius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: radius + 2)
+            .strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 2)
+            .padding(-3)
+    }
+
+    private func switchKind(to newTab: Tab) {
+        guard Self.tab(for: background) != newTab else { return }
+        switch newTab {
+        case .gradient: background = Presets.gradients[5].style
+        case .wallpaper: background = Presets.wallpapers[0].style
+        case .solid: background = .solid(.white)
+        case .image:
+            if let lastImage { background = .image(lastImage) }
+        case .none: background = .transparent
+        }
+    }
+
+    private static func tab(for background: BackgroundStyle) -> Tab {
+        switch background {
+        case .linearGradient: .gradient
+        case .mesh: .wallpaper
+        case .solid: .solid
+        case .image: .image
+        case .transparent: .none
+        }
+    }
+
+    private func chooseImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.message = "Choose a background image"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        setImage(url)
+    }
+
+    private func useWallpaper() {
+        guard let screen = NSScreen.main, let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return }
+        setImage(url)
+    }
+
+    /// Copies the image into Application Support so the background keeps working later.
+    private func setImage(_ url: URL) {
+        guard ImageLoader.load(url) != nil else { return }
+        let destination = Preferences.backgroundsFolder
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(url.pathExtension.isEmpty ? "png" : url.pathExtension)
+        let path = (try? FileManager.default.copyItem(at: url, to: destination)) != nil ? destination.path : url.path
+        let spec = ImageBackgroundSpec(path: path, blur: lastImage?.blur ?? 0)
+        lastImage = spec
+        background = .image(spec)
+    }
+}

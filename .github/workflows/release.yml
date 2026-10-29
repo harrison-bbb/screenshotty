@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Test
+        run: swift test
+      - name: Build universal app
+        env:
+          UNIVERSAL: "1"
+        run: scripts/build-app.sh "${GITHUB_REF_NAME}"
+      - name: Package DMG and ZIP
+        run: scripts/make-dmg.sh
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/Screenshotty.dmg dist/Screenshotty.zip \
+            --title "Screenshotty ${GITHUB_REF_NAME}" --generate-notes
