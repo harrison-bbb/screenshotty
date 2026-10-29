@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Log.write("launch \(Bundle.main.shortVersion) (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? "?")) permission=\(CaptureService.hasScreenRecordingPermission)")
         NSApp.mainMenu = MainMenu.build()
         setUpStatusItem()
 
@@ -35,6 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 DispatchQueue.main.async { self?.updateActivationPolicy() }
             }
             .store(in: &cancellables)
+
+        if UserDefaults.standard.bool(forKey: "requestPermissionOnLaunch") {
+            UserDefaults.standard.removeObject(forKey: "requestPermissionOnLaunch")
+            CaptureService.requestScreenRecordingPermission()
+        }
 
         if !prefs.hasLaunchedBefore {
             prefs.hasLaunchedBefore = true
@@ -155,8 +161,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         isCapturing = true
         Task { @MainActor in
             defer { isCapturing = false }
-            guard let image = await CaptureService.capture(mode) else { return } // cancelled
-            handleCaptured(image)
+            switch await CaptureService.capture(mode) {
+            case .image(let image): handleCaptured(image)
+            case .cancelled: break
+            case .blocked: showCaptureBlockedAlert()
+            }
         }
     }
 
@@ -180,9 +189,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    /// Shown when macOS hands back an empty image even though permission looks granted.
+    /// This happens when the permission was given to a different build of the app.
+    func showCaptureBlockedAlert() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "macOS blocked the capture"
+        alert.informativeText = """
+        The screenshot came back empty. This happens when Screen Recording permission was given to \
+        an older copy of Screenshotty, for example before an update.
+
+        Click Reset Permission. Screenshotty will restart and macOS will ask again. Allow it, then \
+        quit and reopen Screenshotty if macOS asks you to.
+        """
+        alert.addButton(withTitle: "Reset Permission")
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Cancel")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            CaptureService.resetScreenRecordingPermission()
+            UserDefaults.standard.set(true, forKey: "requestPermissionOnLaunch")
+            CaptureService.relaunch()
+        case .alertSecondButtonReturn:
+            CaptureService.openScreenRecordingSettings()
+        default:
+            break
+        }
+    }
+
     /// Returns true if capture should go ahead.
     private func ensureScreenRecordingPermission() -> Bool {
         if CaptureService.hasScreenRecordingPermission { return true }
+        Log.write("capture requested without Screen Recording permission")
         CaptureService.requestScreenRecordingPermission()
 
         NSApp.activate(ignoringOtherApps: true)

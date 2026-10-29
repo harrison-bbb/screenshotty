@@ -31,6 +31,10 @@ fi
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 echo "==> Ad-hoc signing"
-codesign --force --deep --sign - --options runtime --timestamp=none "$APP"
+# Ad-hoc signatures normally identify the app by a hash of this exact build, so macOS forgets the
+# Screen Recording permission after every update. Pinning the designated requirement to the bundle
+# identifier keeps the permission across builds and releases.
+codesign --force --deep --sign - --options runtime --timestamp=none --identifier com.screenshotty.app \
+  --requirements '=designated => identifier "com.screenshotty.app"' "$APP"
 
 echo "==> Done: $APP"

@@ -14,9 +14,10 @@ open build/Screenshotty.app
 
 You can also open `Package.swift` in Xcode.
 
-Each local build is ad-hoc signed with a new signature, so macOS may ask for Screen Recording
-permission again after rebuilding. If capture shows only your wallpaper, remove Screenshotty from
-**Privacy & Security → Screen & System Audio Recording**, add it again, and relaunch.
+Builds are ad-hoc signed with a designated requirement pinned to the bundle identifier
+(`com.screenshotty.app`), so Screen Recording permission survives rebuilds and updates. Do not remove
+that requirement from `scripts/build-app.sh`: without it every build looks like a new app to macOS and
+captures silently come back empty. Capture diagnostics go to `~/Library/Logs/Screenshotty.log`.
 
 ## How the code is organised
 

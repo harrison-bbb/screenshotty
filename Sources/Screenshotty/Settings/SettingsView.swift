@@ -38,6 +38,12 @@ struct SettingsView: View {
                         if !hasPermission {
                             Button("Open Settings") { CaptureService.openScreenRecordingSettings() }
                         }
+                        Button("Reset") {
+                            CaptureService.resetScreenRecordingPermission()
+                            UserDefaults.standard.set(true, forKey: "requestPermissionOnLaunch")
+                            CaptureService.relaunch()
+                        }
+                        .help("Fixes captures that come back empty after an update. Screenshotty restarts and macOS asks for permission again.")
                     }
                 }
             }

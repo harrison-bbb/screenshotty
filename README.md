@@ -72,6 +72,15 @@ xattr -dr com.apple.quarantine /Applications/Screenshotty.app
 macOS asks for **Screen Recording** permission the first time you capture. Turn on Screenshotty in
 **System Settings → Privacy & Security → Screen & System Audio Recording**, then quit and reopen Screenshotty.
 
+### Troubleshooting
+
+**Captures come out as just the background.** macOS is blocking the capture, usually because permission was
+given to an older copy of the app. Screenshotty detects this and offers **Reset Permission**. You can also go to
+**Settings → Screen Recording → Reset**. Screenshotty restarts and macOS asks again. Version 0.1.1 and later
+keep the permission across updates.
+
+Diagnostics are written to `~/Library/Logs/Screenshotty.log`. Please attach it when you file an issue.
+
 ## Usage
 
 | Action | Shortcut |
