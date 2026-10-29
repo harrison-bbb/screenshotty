@@ -96,4 +96,12 @@ public enum Presets {
     }
 
     public static let defaultBackground: BackgroundStyle = gradients[5].style
+
+    /// The wallpaper shown on the MacBook screen behind a window.
+    public static let macDesktop: BackgroundStyle = .mesh(MeshSpec(base: RGBAColor(hex: "#1B2A6B")!, blobs: [
+        MeshBlob(x: 0.15, y: 0.15, radius: 0.75, color: RGBAColor(hex: "#3A6FE0")!),
+        MeshBlob(x: 0.85, y: 0.25, radius: 0.65, color: RGBAColor(hex: "#7B4BD8")!),
+        MeshBlob(x: 0.30, y: 0.95, radius: 0.70, color: RGBAColor(hex: "#1E9BD7")!),
+        MeshBlob(x: 0.90, y: 0.90, radius: 0.60, color: RGBAColor(hex: "#C04A9E")!),
+    ]))
 }

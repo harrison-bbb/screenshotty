@@ -6,7 +6,7 @@ struct InspectorView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 0) {
                 InspectorSection("Style") {
                     StylePicker(model: model)
                 }
@@ -17,7 +17,18 @@ struct InspectorView: View {
                                          smartSuggestions: model.smartSuggestions)
                 }
 
-                InspectorSection("Canvas") {
+                InspectorSection("Frame") {
+                    TilePicker(title: "Mockup", selection: $model.settings.device,
+                               options: DeviceStyle.allCases, label: \.title, symbol: \.symbol)
+                    WindowControl(settings: $model.settings)
+                    LabeledPicker(title: "Shadow", selection: $model.settings.shadow)
+                    if model.settings.device == .none {
+                        CornerRadiusControl(settings: $model.settings)
+                        LabeledPicker(title: "Border", selection: $model.settings.frame)
+                    }
+                }
+
+                InspectorSection("Layout") {
                     AspectRatioGrid(selection: $model.settings.aspectRatio)
                     LabeledSlider(title: "Padding", value: $model.settings.padding,
                                   range: CompositionSettings.paddingRange)
@@ -30,9 +41,9 @@ struct InspectorView: View {
                     .help("Exact width of the exported image. Original keeps the screenshot's own resolution.")
                 }
 
-                InspectorSection("Screenshot") {
+                InspectorSection("Screenshot", showsDivider: false) {
                     Toggle("Auto-trim and balance margins", isOn: $model.settings.autoTrim)
-                        .help("Removes uneven plain borders so the content is perfectly centred")
+                        .help("Removes uneven borders, slivers and cut-off content so the content is perfectly centred")
                     if model.settings.autoTrim {
                         LabeledSlider(title: "Inner margin", value: $model.settings.innerPadding,
                                       range: CompositionSettings.innerPaddingRange)
@@ -41,15 +52,6 @@ struct InspectorView: View {
                                   ? "Even space around the content, in the screenshot's own background colour"
                                   : "Only applies to screenshots with a plain background, such as text")
                     }
-                    if model.settings.device == .none {
-                        CornerRadiusControl(settings: $model.settings)
-                    }
-                    LabeledPicker(title: "Shadow", selection: $model.settings.shadow)
-                    WindowControl(settings: $model.settings)
-                    LabeledPicker(title: "Mockup", selection: $model.settings.device)
-                    if model.settings.device == .none {
-                        LabeledPicker(title: "Frame", selection: $model.settings.frame)
-                    }
                 }
 
                 Button("Reset to Defaults") { model.resetStyle() }
@@ -57,7 +59,7 @@ struct InspectorView: View {
                     .padding(.top, 4)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 44)
+            .padding(.top, 38)
             .padding(.bottom, 20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -67,20 +69,85 @@ struct InspectorView: View {
 
 struct InspectorSection<Content: View>: View {
     let title: String
+    let showsDivider: Bool
     @ViewBuilder let content: Content
 
-    init(_ title: String, @ViewBuilder content: () -> Content) {
+    init(_ title: String, showsDivider: Bool = true, @ViewBuilder content: () -> Content) {
         self.title = title
+        self.showsDivider = showsDivider
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title.uppercased())
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .tracking(0.6)
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
             content
+        }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            if showsDivider { Divider() }
+        }
+    }
+}
+
+/// A row of tiles with an icon and a label, like the aspect ratio picker.
+struct TilePicker<Option: Hashable>: View {
+    let title: String
+    @Binding var selection: Option
+    let options: [Option]
+    let label: KeyPath<Option, String>
+    let symbol: KeyPath<Option, String>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.callout)
+            HStack(spacing: 6) {
+                ForEach(options, id: \.self) { option in
+                    let selected = option == selection
+                    Button { selection = option } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: option[keyPath: symbol])
+                                .font(.system(size: 16, weight: .regular))
+                                .frame(height: 20)
+                            Text(option[keyPath: label])
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                        .background(RoundedRectangle(cornerRadius: 8)
+                            .fill(selected ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.05)))
+                        .overlay(RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(selected ? Color.accentColor : .clear, lineWidth: 1.5))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(option[keyPath: label])
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+        }
+    }
+}
+
+extension DeviceStyle {
+    var symbol: String {
+        switch self {
+        case .none: "rectangle.dashed"
+        case .macbook: "laptopcomputer"
+        case .iphone: "iphone"
+        }
+    }
+}
+
+extension WindowChromeStyle.Kind {
+    var symbol: String {
+        switch self {
+        case .none: "rectangle.dashed"
+        case .macOS: "macwindow"
+        case .browser: "safari"
         }
     }
 }
@@ -124,10 +191,10 @@ struct WindowControl: View {
     var body: some View {
         let chrome = settings.windowChrome
         VStack(alignment: .leading, spacing: 6) {
-            Text("Window").font(.callout)
-            CompactTabBar(selection: Binding(get: { chrome.kind },
-                                             set: { settings.windowChrome = WindowChromeStyle(kind: $0, dark: chrome.isDark) }),
-                          options: WindowChromeStyle.Kind.allCases, title: \.title)
+            TilePicker(title: "Window",
+                       selection: Binding(get: { chrome.kind },
+                                          set: { settings.windowChrome = WindowChromeStyle(kind: $0, dark: chrome.isDark) }),
+                       options: WindowChromeStyle.Kind.allCases, label: \.title, symbol: \.symbol)
             if chrome.kind != .none {
                 CompactTabBar(selection: Binding(get: { chrome.isDark },
                                                  set: { settings.windowChrome = WindowChromeStyle(kind: chrome.kind, dark: $0) }),
@@ -215,16 +282,17 @@ struct CompactTabBar<Option: Hashable>: View {
     let title: KeyPath<Option, String>
 
     var body: some View {
-        HStack(spacing: 2) {
+        let fontSize: CGFloat = options.count >= 6 ? 11 : 12
+        SharedWidthLayout(spacing: 2) {
             ForEach(options, id: \.self) { option in
                 let selected = option == selection
                 Button {
                     selection = option
                 } label: {
                     Text(option[keyPath: title])
-                        .font(.system(size: 12, weight: selected ? .semibold : .regular))
+                        .font(.system(size: fontSize, weight: selected ? .semibold : .regular))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, 4)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 5)
                         .background(RoundedRectangle(cornerRadius: 6)
@@ -238,6 +306,30 @@ struct CompactTabBar<Option: Hashable>: View {
         }
         .padding(2)
         .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.07)))
+    }
+}
+
+/// Lays children out in a row: each gets its natural width plus an equal share of the space left,
+/// so every label stays whole and the same size, and the row still fills its container.
+struct SharedWidthLayout: Layout {
+    var spacing: CGFloat = 2
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let ideal = subviews.map { $0.sizeThatFits(.unspecified) }
+        let natural = ideal.map(\.width).reduce(0, +) + spacing * CGFloat(max(subviews.count - 1, 0))
+        return CGSize(width: proposal.width ?? natural, height: ideal.map(\.height).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let ideal = subviews.map { $0.sizeThatFits(.unspecified).width }
+        let gaps = spacing * CGFloat(max(subviews.count - 1, 0))
+        let extra = (bounds.width - gaps - ideal.reduce(0, +)) / CGFloat(max(subviews.count, 1))
+        var x = bounds.minX
+        for (index, subview) in subviews.enumerated() {
+            let width = max(ideal[index] + extra, 0)
+            subview.place(at: CGPoint(x: x, y: bounds.minY), proposal: ProposedViewSize(width: width, height: bounds.height))
+            x += width + spacing
+        }
     }
 }
 

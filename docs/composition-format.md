@@ -62,7 +62,13 @@ Colours are hex strings: `#RRGGBB` or `#RRGGBBAA`.
 3. Remove rows and columns at the edges that are entirely background.
 4. If the background is a colour (not transparent), add an even inner margin of that colour around the content: `innerPadding` units, and never less than half the corner radius, so rounded corners cannot clip the content.
 5. The card is the screenshot plus a title bar: 28 units for `light` and `dark`, 46 units for the browser styles. Traffic lights are 12 units wide, 20 units apart, with the first centred 20 units from the left, moved right only if needed to stay inside the rounded corner.
-6. With a `device`, the card sits inside it. MacBook: a bezel of 3.2% of the card width (1.5× at the bottom), and a base 16% wider than the lid and 3.4% of its width tall. iPhone: a bezel of 4.5% of the card width, body corner radius 15.5% of its shortest side. The device (including the base) is what gets padded and centred.
+6. With a `device`, the card sits on the device's screen, which keeps the real shape: 3024×1964 for the MacBook, 1179×2556 for the iPhone (turned landscape for wide shots).
+   - **Full screen:** when the card's shape is within 5% (MacBook) or 6% (iPhone) of the screen's, the screen takes the card's exact size.
+   - **MacBook desktop:** otherwise the card sits centred on a desktop wallpaper with a margin of 7% of its longest side, keeps its corner radius (at least 10 units) and gets a medium shadow. The notch is drawn only in this mode.
+   - **iPhone app:** a portrait card that isn't phone-shaped sits below a status bar (54/393 of the screen width) with room for the home indicator (34/393), centred horizontally.
+   - Gaps beside a full-screen card are filled with the most common colour of the card edge they touch.
+   - MacBook bezels are 2.2% of the screen width at the sides, 3% at the top and 4.2% at the bottom, with a base 12% wider than the lid. iPhone bezels are 4% of the screen's short side, with screen corners of 14%.
+   The device (including the base) is what gets padded and centred.
 7. The minimum canvas is the card (or device) plus `padding` on each side, plus a 14-unit frame when `frame` is `glass`.
 8. For a fixed aspect ratio, the canvas grows along one axis until it matches. With `auto`, it grows only if needed to keep the shape between 4:5 and 2:1.
 9. Canvas width and height are rounded up so the space left on each side of the card is a whole pixel. The card is centred exactly.

@@ -38,11 +38,38 @@ public enum Compositor {
         BackgroundRenderer.draw(settings.background, in: ctx, rect: canvas, unit: layout.unit * scaleX)
         if let device = layout.device {
             DeviceFrame.drawBody(settings.device, geometry: device, shadow: settings.shadow, unit: layout.unit, in: ctx)
-            drawCard(source, settings: settings, layout: layout, in: ctx, shadow: false)
-            DeviceFrame.drawOverlay(settings.device, geometry: device, screen: layout.cardRect, in: ctx)
+            let colors = DeviceFrame.ScreenColors.sample(source)
+            ctx.saveGState()
+            let screenPath = CGPath(roundedRect: device.screenRect, cornerWidth: device.screenCornerRadius,
+                                    cornerHeight: device.screenCornerRadius, transform: nil)
+            ctx.addPath(screenPath)
+            ctx.clip()
+            switch device.mode {
+            case .desktop:
+                // A window on a Mac desktop.
+                BackgroundRenderer.draw(Presets.macDesktop, in: ctx, rect: device.screenRect, unit: layout.unit)
+                drawCard(source, settings: settings, layout: layout, in: ctx, shadow: .medium)
+            case .fullBleed, .phoneApp:
+                let screen = device.screenRect
+                let card = layout.cardRect
+                ctx.setFillColor(colors.fill.cgColor)
+                ctx.fill(screen)
+                ctx.setFillColor(colors.left.cgColor)
+                ctx.fill(CGRect(x: screen.minX, y: screen.minY, width: card.minX - screen.minX, height: screen.height))
+                ctx.setFillColor(colors.right.cgColor)
+                ctx.fill(CGRect(x: card.maxX, y: screen.minY, width: screen.maxX - card.maxX, height: screen.height))
+                if device.mode == .phoneApp {
+                    ctx.setFillColor(colors.top.cgColor)
+                    ctx.fill(CGRect(x: device.screenRect.minX, y: device.screenRect.minY,
+                                    width: device.screenRect.width, height: device.statusBarHeight))
+                }
+                drawCard(source, settings: settings, layout: layout, in: ctx, shadow: nil)
+            }
+            ctx.restoreGState()
+            DeviceFrame.drawOverlay(settings.device, geometry: device, colors: colors, in: ctx)
         } else {
             drawFrame(settings.frame, layout: layout, in: ctx)
-            drawCard(source, settings: settings, layout: layout, in: ctx, shadow: true)
+            drawCard(source, settings: settings, layout: layout, in: ctx, shadow: settings.shadow)
         }
 
         guard let image = ctx.makeImage() else { throw CompositorError.contextCreationFailed }
@@ -120,13 +147,13 @@ public enum Compositor {
     }
 
     private static func drawCard(_ source: CGImage, settings: CompositionSettings, layout: CompositionLayout,
-                                 in ctx: CGContext, shadow drawsShadow: Bool) {
+                                 in ctx: CGContext, shadow: ShadowStyle?) {
         let card = layout.cardRect
         let cardPath = CGPath(roundedRect: card, cornerWidth: layout.cornerRadius,
                               cornerHeight: layout.cornerRadius, transform: nil)
 
         ctx.saveGState()
-        if drawsShadow, let shadow = settings.shadow.parameters {
+        if let shadow = shadow?.parameters {
             // Layout space is flipped, and CG shadow offsets ignore the CTM, so y is negated in device space.
             let scale = ctx.ctm.a
             ctx.setShadow(offset: CGSize(width: 0, height: -shadow.offsetY * layout.unit * scale),

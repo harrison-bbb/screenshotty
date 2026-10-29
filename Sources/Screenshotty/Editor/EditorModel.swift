@@ -79,7 +79,10 @@ final class EditorModel: ObservableObject {
     // MARK: Annotations
 
     @Published private(set) var annotations: [Annotation] = [] {
-        didSet { scheduleRender() }
+        didSet {
+            scheduleRender()
+            refreshStyleThumbnails()
+        }
     }
     @Published var selectedID: UUID?
     @Published var tool: AnnotationTool = .arrow
@@ -117,6 +120,7 @@ final class EditorModel: ObservableObject {
         crop = cleaned
         analysis = nil
         updateShot()
+        refreshStyleThumbnails()
     }
 
     /// What auto-trim kept, in capture pixels (for showing it in the crop tool).
@@ -166,6 +170,38 @@ final class EditorModel: ObservableObject {
 
     // MARK: Styles
 
+    /// This screenshot rendered in each style, keyed by style id, for the style cards.
+    @Published private(set) var styleThumbnails: [String: CGImage] = [:]
+    private var thumbnailTask: Task<Void, Never>?
+    private var cancellables = Set<AnyCancellable>()
+
+    private func refreshStyleThumbnails() {
+        thumbnailTask?.cancel()
+        let styles = Preferences.shared.allStyles
+        let source = source
+        let crop = crop
+        let annotations = annotations
+        let analysis = analysis
+        thumbnailTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled else { return }
+            let rendered = await Task.detached(priority: .utility) { () -> [String: CGImage] in
+                var result: [String: CGImage] = [:]
+                for style in styles {
+                    let settings = style.settings.resolved(for: source)
+                    let prepared = ShotPreparer.prepareShot(source, crop: crop, analysis: analysis, settings: settings)
+                    let shot = AnnotationRenderer.apply(annotations, to: prepared.image, offset: prepared.offset)
+                    let canvas = CompositionLayout(imageSize: CGSize(width: shot.width, height: shot.height), settings: settings).canvasSize
+                    let scale = min(1, 360 / max(canvas.width, canvas.height))
+                    result[style.id] = try? Compositor.render(shot, settings: settings, scale: scale)
+                }
+                return result
+            }.value
+            guard !Task.isCancelled else { return }
+            self?.styleThumbnails = rendered
+        }
+    }
+
     func apply(_ style: Style) {
         settings = style.settings.resolved(for: source)
     }
@@ -191,6 +227,11 @@ final class EditorModel: ObservableObject {
         self.settings = settings.resolved(for: image)
         updateShot()
         scanForSensitiveInfo()
+        refreshStyleThumbnails()
+        Preferences.shared.$savedStyles
+            .dropFirst()
+            .sink { [weak self] _ in DispatchQueue.main.async { self?.refreshStyleThumbnails() } }
+            .store(in: &cancellables)
     }
 
     private static func suggestions(for image: CGImage) -> [SmartSuggestion] {
@@ -247,6 +288,7 @@ final class EditorModel: ObservableObject {
         selectedID = nil
         updateShot()
         scanForSensitiveInfo()
+        refreshStyleThumbnails()
     }
 
     func resetStyle() {

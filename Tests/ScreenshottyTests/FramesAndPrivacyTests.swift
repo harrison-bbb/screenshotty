@@ -181,3 +181,52 @@ enum Fake {
         #expect(old.windowChrome == .dark)
     }
 }
+
+@Suite struct DeviceModeTests {
+    func geometry(_ device: DeviceStyle, _ w: CGFloat, _ h: CGFloat) -> CompositionLayout.DeviceGeometry {
+        var settings = CompositionSettings.default
+        settings.device = device
+        return CompositionLayout(imageSize: CGSize(width: w, height: h), settings: settings).device!
+    }
+
+    @Test func iPhoneKeepsARealScreenShape() {
+        for (w, h) in [(1600.0, 1000.0), (800.0, 1400.0), (1179.0, 2556.0), (1000.0, 1000.0)] {
+            let g = geometry(.iphone, w, h)
+            let aspect = g.screenRect.width / g.screenRect.height
+            let expected = g.landscape ? 1 / CompositionLayout.iPhoneScreenAspect : CompositionLayout.iPhoneScreenAspect
+            #expect(abs(aspect / expected - 1) < 0.06, "screen \(g.screenRect.size) for a \(w)×\(h) shot")
+        }
+    }
+
+    @Test func wideShotsTurnThePhoneLandscape() {
+        #expect(geometry(.iphone, 1600, 1000).landscape)
+        #expect(!geometry(.iphone, 800, 1400).landscape)
+    }
+
+    @Test func phoneScreenshotsFillTheScreenAndOthersGetAStatusBar() {
+        let native = geometry(.iphone, 1179, 2556)
+        #expect(native.mode == .fullBleed)
+        #expect(native.statusBarHeight == 0)
+        let app = geometry(.iphone, 800, 1400)
+        #expect(app.mode == .phoneApp)
+        #expect(app.statusBarHeight > 0)
+    }
+
+    @Test func macBookFillsWithScreenShapedShotsAndShowsADesktopOtherwise() {
+        #expect(geometry(.macbook, 3024, 1964).mode == .fullBleed)
+        #expect(geometry(.macbook, 1600, 1040).mode == .fullBleed)
+        let tall = geometry(.macbook, 800, 1200)
+        #expect(tall.mode == .desktop)
+        #expect(abs(tall.screenRect.width / tall.screenRect.height / CompositionLayout.macBookScreenAspect - 1) < 0.01)
+    }
+
+    @Test func windowInsideMacBookStaysWhole() {
+        var settings = CompositionSettings.default
+        settings.device = .macbook
+        settings.windowChrome = .browserLight
+        let layout = CompositionLayout(imageSize: CGSize(width: 900, height: 900), settings: settings)
+        let g = layout.device!
+        #expect(g.screenRect.contains(layout.cardRect))
+        #expect(layout.cornerRadius > 0)   // a window on a desktop keeps its rounded corners
+    }
+}

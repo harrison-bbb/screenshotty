@@ -2,46 +2,28 @@ import AppKit
 import ScreenshottyCore
 import SwiftUI
 
-/// One-click looks: built-in styles for common destinations, plus the user's own saved styles.
+/// One-click looks, shown as cards that preview this screenshot in each style.
 struct StylePicker: View {
     @ObservedObject var model: EditorModel
     @ObservedObject private var prefs = Preferences.shared
 
     var body: some View {
         let active = model.activeStyle?.id
-        VStack(alignment: .leading, spacing: 8) {
-            FlowLayout(spacing: 6) {
-                ForEach(prefs.allStyles) { style in
-                    Button { model.apply(style) } label: {
-                        Text(style.name)
-                            .font(.system(size: 12, weight: active == style.id ? .semibold : .regular))
-                            .lineLimit(1)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Capsule().fill(active == style.id ? Color.accentColor.opacity(0.2) : Color.primary.opacity(0.06)))
-                            .overlay(Capsule().strokeBorder(active == style.id ? Color.accentColor : .clear, lineWidth: 1.5))
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .help(style.summary)
-                    .contextMenu {
-                        if !style.isBuiltIn {
-                            Button("Update to Current Look") { update(style) }
-                            Button("Rename…") { rename(style) }
-                            Divider()
-                            Button("Delete", role: .destructive) { prefs.savedStyles.removeAll { $0.id == style.id } }
-                        }
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+            ForEach(prefs.allStyles) { style in
+                StyleCard(style: style, thumbnail: model.styleThumbnails[style.id], selected: active == style.id) {
+                    model.apply(style)
+                }
+                .contextMenu {
+                    if !style.isBuiltIn {
+                        Button("Update to Current Look") { update(style) }
+                        Button("Rename…") { rename(style) }
+                        Divider()
+                        Button("Delete", role: .destructive) { prefs.savedStyles.removeAll { $0.id == style.id } }
                     }
                 }
             }
-            Button {
-                save()
-            } label: {
-                Label("Save Current Look as Style…", systemImage: "plus")
-            }
-            .buttonStyle(.link)
-            .font(.callout)
-            .disabled(active != nil)
+            SaveStyleCard(enabled: active == nil, action: save)
         }
     }
 
@@ -79,7 +61,97 @@ struct StylePicker: View {
     }
 }
 
+/// A style: a live preview of the screenshot in that look, with its name and size.
+private struct StyleCard: View {
+    let style: Style
+    let thumbnail: CGImage?
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.05))
+                    if let thumbnail {
+                        Image(decorative: thumbnail, scale: 1)
+                            .resizable()
+                            .interpolation(.high)
+                            .aspectRatio(contentMode: .fit)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .padding(6)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                .frame(height: 78)
+                .overlay(alignment: .topTrailing) {
+                    if selected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, Color.accentColor)
+                            .padding(5)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(style.name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                    Text(style.shortSummary)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 2)
+            }
+            .padding(6)
+            .background(RoundedRectangle(cornerRadius: 11)
+                .fill(selected ? Color.accentColor.opacity(0.12) : hovering ? Color.primary.opacity(0.05) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 11)
+                .strokeBorder(selected ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: selected ? 1.5 : 1))
+            .contentShape(RoundedRectangle(cornerRadius: 11))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(style.summary)
+        .accessibilityLabel(style.name)
+    }
+}
+
+private struct SaveStyleCard: View {
+    let enabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .medium))
+                Text("Save current look")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .multilineTextAlignment(.center)
+            }
+            .foregroundStyle(enabled ? Color.accentColor : Color.secondary)
+            .frame(maxWidth: .infinity, minHeight: 124)
+            .background(RoundedRectangle(cornerRadius: 11)
+                .strokeBorder(Color.primary.opacity(0.15), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+            .contentShape(RoundedRectangle(cornerRadius: 11))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .help(enabled ? "Save these settings as a reusable style" : "This look is already a style")
+    }
+}
+
 extension Style {
+    /// "16:9 · 1600 px"
+    var shortSummary: String {
+        let shape = settings.aspectRatio == .auto ? "Any size" : settings.aspectRatio.title
+        return settings.exportWidth.map { "\(shape) · \($0) px" } ?? shape
+    }
+
     /// "16:9 · 1600 px · Browser"
     var summary: String {
         var parts: [String] = [settings.aspectRatio == .auto ? "Auto size" : settings.aspectRatio.title]
