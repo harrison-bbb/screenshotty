@@ -29,6 +29,7 @@ final class SmartCapture {
         guard let screens = try? await ScreenFreezer.freeze(), !screens.isEmpty else { return nil }
         let detector = RegionDetector(windows: windows)
         let capture = SmartCapture(screens: screens, detector: detector)
+        active = capture
         for screen in screens {
             DispatchQueue.global(qos: .userInitiated).async {
                 detector.findTextBlocks(in: screen)
@@ -103,17 +104,30 @@ final class SmartCapture {
                 continuation?.resume(returning: .image(image))
             } else {
                 continuation?.resume(returning: .cancelled)
+                dismiss(returnFocus: true)
             }
             continuation = nil
-            // The editor (if any) is on screen by now: remove the overlay, and if nothing of ours is
-            // showing, give focus straight back to the app the user was in.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                MainActor.assumeIsolated {
-                    self.close()
-                    self.returnFocusIfIdle()
-                }
+            // Safety net: if nobody dismisses the hidden overlay (it should be within a moment), do it.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                MainActor.assumeIsolated { self?.dismiss(returnFocus: false) }
             }
         }
+    }
+
+    /// The picker whose hidden overlay is waiting for the capture to be handled.
+    private static var active: SmartCapture?
+
+    /// Called once the capture has been handled (editor open, or image copied or saved). Removes the
+    /// hidden overlay; `returnFocus` gives focus back to the app the user was in when no editor opened.
+    static func captureHandled(openedWindow: Bool) {
+        active?.dismiss(returnFocus: !openedWindow)
+    }
+
+    private func dismiss(returnFocus: Bool) {
+        guard !overlays.isEmpty else { return }
+        close()
+        if returnFocus { returnFocusIfIdle() }
+        if Self.active === self { Self.active = nil }
     }
 
     /// The app that was in front before the picker opened.
@@ -125,10 +139,9 @@ final class SmartCapture {
     }
 
     func cancel() {
-        close()
         continuation?.resume(returning: .cancelled)
         continuation = nil
-        returnFocusIfIdle()
+        dismiss(returnFocus: true)
     }
 
     private func close() {

@@ -18,6 +18,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.write("launch \(Bundle.main.shortVersion) (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? "?")) permission=\(CaptureService.hasScreenRecordingPermission)")
         NSApp.mainMenu = MainMenu.build()
+        // Diagnostics: note every desktop (Space) switch and what's in front, to trace unexpected jumps.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
+                                                          object: nil, queue: .main) { _ in
+            Log.write("desktop switched: front=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?")")
+        }
         // Load the on-device text recognition model now, so the first sensitive-info check is quick.
         Task.detached(priority: .utility) {
             SensitiveScanner.warmUp()
@@ -208,7 +213,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if result == nil { Log.write("smart capture unavailable, using the system picker") }
             }
             switch await result.asyncOr({ await CaptureService.capture(mode) }) {
-            case .image(let image): handleCaptured(image)
+            case .image(let image):
+                handleCaptured(image)
+                // Only now let the picker's hidden overlay go, so focus never passes to another app.
+                SmartCapture.captureHandled(openedWindow: prefs.afterCapture == .openEditor)
             case .cancelled: break
             case .blocked: showCaptureBlockedAlert()
             }
