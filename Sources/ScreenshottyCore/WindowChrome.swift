@@ -31,19 +31,26 @@ enum WindowChrome {
         return (0..<3).map { CGPoint(x: firstX + CGFloat($0) * lightSpacing * unit, y: y) }
     }
 
+    /// The title bar's background colour.
+    static func barColor(_ style: WindowChromeStyle) -> RGBAColor {
+        switch (style.kind, style.isDark) {
+        case (.browser, true): RGBAColor(hex: "#2B2B2E")!
+        case (.browser, false): RGBAColor(hex: "#F2F2F3")!
+        case (_, true): RGBAColor(hex: "#2C2C2E")!
+        default: RGBAColor(hex: "#EDECEC")!
+        }
+    }
+
     static func draw(_ style: WindowChromeStyle, in ctx: CGContext, rect: CGRect, unit: CGFloat, cornerRadius: CGFloat,
                      url: String = "") {
         guard style != .none, rect.height > 0 else { return }
         let dark = style.isDark
-        let fill: RGBAColor
-        let separator: RGBAColor
-        switch style.kind {
-        case .browser:
-            fill = dark ? RGBAColor(hex: "#2B2B2E")! : RGBAColor(hex: "#F2F2F3")!
-            separator = dark ? RGBAColor(hex: "#151517")! : RGBAColor(hex: "#D9D9DB")!
-        default:
-            fill = dark ? RGBAColor(hex: "#2C2C2E")! : RGBAColor(hex: "#EDECEC")!
-            separator = dark ? RGBAColor(hex: "#1A1A1C")! : RGBAColor(hex: "#D4D3D3")!
+        let fill = barColor(style)
+        let separator: RGBAColor = switch (style.kind, dark) {
+        case (.browser, true): RGBAColor(hex: "#151517")!
+        case (.browser, false): RGBAColor(hex: "#D9D9DB")!
+        case (_, true): RGBAColor(hex: "#1A1A1C")!
+        default: RGBAColor(hex: "#D4D3D3")!
         }
 
         ctx.saveGState()

@@ -54,10 +54,20 @@ public enum Compositor {
                 let card = layout.cardRect
                 ctx.setFillColor(colors.fill.cgColor)
                 ctx.fill(screen)
-                ctx.setFillColor(colors.left.cgColor)
-                ctx.fill(CGRect(x: screen.minX, y: screen.minY, width: card.minX - screen.minX, height: screen.height))
-                ctx.setFillColor(colors.right.cgColor)
-                ctx.fill(CGRect(x: card.maxX, y: screen.minY, width: screen.maxX - card.maxX, height: screen.height))
+                // The side fills run 2 px under the screenshot, so no seam shows where the edges are blended.
+                if card.minX > screen.minX {
+                    ctx.setFillColor(colors.left.cgColor)
+                    ctx.fill(CGRect(x: screen.minX, y: screen.minY, width: card.minX - screen.minX + 2, height: screen.height))
+                }
+                if card.maxX < screen.maxX {
+                    ctx.setFillColor(colors.right.cgColor)
+                    ctx.fill(CGRect(x: card.maxX - 2, y: screen.minY, width: screen.maxX - card.maxX + 2, height: screen.height))
+                }
+                if layout.titleBarHeight > 0 {
+                    // Carry the window's title bar across the gaps so it doesn't look cut short.
+                    ctx.setFillColor(WindowChrome.barColor(settings.windowChrome).cgColor)
+                    ctx.fill(CGRect(x: screen.minX, y: card.minY, width: screen.width, height: layout.titleBarHeight))
+                }
                 if device.mode == .phoneApp {
                     ctx.setFillColor(colors.top.cgColor)
                     ctx.fill(CGRect(x: device.screenRect.minX, y: device.screenRect.minY,
