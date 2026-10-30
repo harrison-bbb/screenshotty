@@ -28,6 +28,11 @@ final class SmartCapture {
         let windows = ScreenFreezer.windows()
         guard let screens = try? await ScreenFreezer.freeze(), !screens.isEmpty else { return nil }
         let detector = RegionDetector(windows: windows)
+        detector.screens = screens
+        // Work out the front window's sections straight away, so the first hover already has them.
+        if let front = windows.first {
+            DispatchQueue.global(qos: .userInitiated).async { _ = detector.sections(of: front) }
+        }
         DispatchQueue.global(qos: .userInitiated).async { detector.enableWebStructure() }
         let capture = SmartCapture(screens: screens, detector: detector)
         active = capture

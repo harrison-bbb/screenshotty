@@ -18,6 +18,10 @@ final class RegionDetector: @unchecked Sendable {
     let canReadElements: Bool
     private let lock = NSLock()
     private var textBlocks: [CGRect] = []
+    /// The frozen displays, for finding visual sections.
+    var screens: [FrozenScreen] = []
+    /// Visual sections per window (global points), found the first time the window is hovered.
+    private var sectionsByWindow: [CGWindowID: [CGRect]] = [:]
 
     init(windows: [PickableWindow]) {
         self.windows = windows
@@ -46,6 +50,8 @@ final class RegionDetector: @unchecked Sendable {
         let blocks = textBlocks
         lock.unlock()
         found += blocks.filter { $0.contains(point) && window.frame.contains($0) }.map { DetectedRegion(rect: $0, label: "Text") }
+        // Visual sections: blocks separated by gutters, which pages often don't describe to Accessibility.
+        found += sections(of: window).filter { $0.contains(point) }.map { DetectedRegion(rect: $0, label: "Section") }
 
         // Smallest first; drop near-duplicates (the first, usually the named element, wins).
         found.sort { $0.rect.width * $0.rect.height < $1.rect.width * $1.rect.height }
@@ -209,10 +215,51 @@ final class RegionDetector: @unchecked Sendable {
         try? VNImageRequestHandler(cgImage: image).perform([request])
     }
 
-    /// Edges the drag can snap to: windows and text blocks.
+    // MARK: Visual sections
+
+    /// The window's visual sections, worked out once from the frozen screen.
+    func sections(of window: PickableWindow) -> [CGRect] {
+        lock.lock()
+        if let cached = sectionsByWindow[window.id] {
+            lock.unlock()
+            return cached
+        }
+        lock.unlock()
+        let found = Self.findSections(of: window, screens: screens)
+        lock.lock()
+        sectionsByWindow[window.id] = found
+        lock.unlock()
+        return found
+    }
+
+    private static func findSections(of window: PickableWindow, screens: [FrozenScreen]) -> [CGRect] {
+        let centre = CGPoint(x: window.frame.midX, y: window.frame.midY)
+        guard let screen = screens.first(where: { $0.globalFrame.contains(centre) }) ?? screens.first else { return [] }
+        let visible = window.frame.intersection(screen.globalFrame)
+        guard !visible.isEmpty, let crop = screen.crop(visible) else { return [] }
+        // Work on a copy about 1000 px wide: fast, and still sharp enough to see gutters.
+        let shrink = min(1, 1000 / CGFloat(crop.width))
+        let width = max(Int(CGFloat(crop.width) * shrink), 1)
+        let height = max(Int(CGFloat(crop.height) * shrink), 1)
+        guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return [] }
+        ctx.interpolationQuality = .medium
+        ctx.draw(crop, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let small = ctx.makeImage() else { return [] }
+        let pixelsPerPoint = CGFloat(width) / visible.width
+        let blocks = LayoutSegmenter.sections(in: small, minGap: Int((10 * pixelsPerPoint).rounded()),
+                                              minSize: Int((24 * pixelsPerPoint).rounded()))
+        return blocks.map {
+            CGRect(x: visible.minX + $0.minX / pixelsPerPoint, y: visible.minY + $0.minY / pixelsPerPoint,
+                   width: $0.width / pixelsPerPoint, height: $0.height / pixelsPerPoint)
+        }
+    }
+
+    /// Edges the drag can snap to: windows, text blocks and the sections found so far.
     func snapEdges() -> (x: [CGFloat], y: [CGFloat]) {
         lock.lock()
-        let rects = textBlocks + windows.map(\.frame)
+        let rects = textBlocks + windows.map(\.frame) + sectionsByWindow.values.flatMap { $0 }
         lock.unlock()
         return (rects.flatMap { [$0.minX, $0.maxX] }, rects.flatMap { [$0.minY, $0.maxY] })
     }
