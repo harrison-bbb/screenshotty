@@ -7,6 +7,8 @@ cask "screenshotty" do
   desc "Beautiful, perfectly centred screenshots with backgrounds"
   homepage "https://github.com/harrison-bbb/screenshotty"
 
+  # Screenshotty updates itself (Sparkle), so `brew upgrade` leaves it alone.
+  auto_updates true
   depends_on macos: ">= :sonoma"
 
   app "Screenshotty.app"

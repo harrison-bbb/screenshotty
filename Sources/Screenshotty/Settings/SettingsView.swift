@@ -5,6 +5,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject private var prefs = Preferences.shared
+    @ObservedObject private var updater = Updater.shared
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var hasPermission = CaptureService.hasScreenRecordingPermission
     @State private var axTrusted = AXIsProcessTrusted()
@@ -96,6 +97,13 @@ struct SettingsView: View {
                     .help("Adds a Dock icon and ⌘Tab entry for open editors. Can make macOS switch desktops right after a capture.")
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }
+                if updater.isAvailable {
+                    LabeledContent {
+                        Button("Check Now") { updater.checkForUpdates() }
+                    } label: {
+                        Toggle("Tell me when there's an update", isOn: $updater.automaticallyChecks)
+                    }
+                }
                 LabeledContent("Screen Recording") {
                     HStack {
                         Label(hasPermission ? "Allowed" : "Not allowed",

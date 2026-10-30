@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var statusItem: NSStatusItem!
     private var captureMenuItem: NSMenuItem!
+    private var updateMenuItem: NSMenuItem!
+    private let updateSeparator = NSMenuItem.separator()
     private var cancellables = Set<AnyCancellable>()
     private var isCapturing = false
     private let prefs = Preferences.shared
@@ -32,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             RegionDetector.warmUp()
         }
         setUpStatusItem()
+        Updater.shared.start()
 
         HotKeyManager.shared.onTrigger = { [weak self] in self?.startCapture(.interactive) }
         prefs.$hotKey
@@ -131,6 +134,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let menu = NSMenu()
+        // Hidden until a background check finds an update (see Updater).
+        updateMenuItem = menu.addItem(withTitle: "", action: #selector(Updater.checkForUpdates), keyEquivalent: "")
+        updateMenuItem.target = Updater.shared
+        updateMenuItem.image = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
+        updateMenuItem.isHidden = true
+        menu.addItem(updateSeparator)
+        updateSeparator.isHidden = true
         captureMenuItem = menu.addItem(withTitle: "Capture Area or Window", action: #selector(captureInteractive), keyEquivalent: "")
         menu.addItem(withTitle: "Capture Full Screen", action: #selector(captureFullScreen), keyEquivalent: "")
         menu.addItem(.separator())
@@ -140,10 +150,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(withTitle: "Import Style…", action: #selector(importStyle), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(withTitle: "Screenshotty on GitHub", action: #selector(openRepository), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Screenshotty", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        for item in menu.items where item.action != #selector(NSApplication.terminate(_:)) {
+        for item in menu.items where item.action != #selector(NSApplication.terminate(_:)) && item !== updateMenuItem {
             item.target = self
         }
         menu.delegate = self
@@ -161,6 +172,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        let version = Updater.shared.availableVersion
+        updateMenuItem.title = version.map { "Update to Screenshotty \($0)…" } ?? ""
+        updateMenuItem.isHidden = version == nil
+        updateSeparator.isHidden = version == nil
+        if let item = menu.items.first(where: { $0.action == #selector(checkForUpdates) }) {
+            item.isHidden = !Updater.shared.isAvailable
+        }
         if let item = menu.items.first(where: { $0.action == #selector(openFromClipboard) }) {
             item.isEnabled = Self.clipboardImage() != nil
         }
@@ -189,6 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func showSettings() { WindowManager.shared.showSettings() }
+    @objc func checkForUpdates() { Updater.shared.checkForUpdates() }
     @objc func openRepository() { NSWorkspace.shared.open(Self.repositoryURL) }
 
     static func clipboardImage() -> CGImage? {

@@ -58,5 +58,20 @@ then add a row to the styles table in `docs/composition-format.md`. The CLI pick
 
 ## Releasing
 
-Push a tag like `v0.4.0`. GitHub Actions builds a universal app, packages a DMG and ZIP, and publishes a release.
-The Homebrew cask and install script always point at the latest release.
+1. Optionally write the release notes in `docs/release-notes/v0.7.0.md` (Markdown). Without one, GitHub lists the changes.
+2. Push a tag like `v0.7.0`.
+
+GitHub Actions builds a universal app, packages the DMG and ZIP, signs the ZIP with the update key and publishes
+a release with `appcast.xml`, the feed installed copies check for updates. The website, Homebrew cask and install
+script always point at the latest release.
+
+**Update key.** Updates are signed with an EdDSA key (Sparkle), stored in the maintainer's login Keychain and in
+the `SPARKLE_PRIVATE_KEY` repository secret; its public half is `SUPublicEDKey` in `Packaging/Info.plist`.
+Keep the private key backed up: if it's lost, installed copies can't verify new updates and everyone has to
+download the next version by hand. To restore the secret from the Keychain (`scripts/make-appcast.sh` downloads the Sparkle tools into `build/`):
+
+```bash
+K=$(mktemp -u) && build/sparkle-tools/bin/generate_keys --account screenshotty -x "$K" && gh secret set SPARKLE_PRIVATE_KEY < "$K"; rm -f "$K"
+```
+
+The website lives in `site/` and deploys to GitHub Pages on every push to `main` that touches it.

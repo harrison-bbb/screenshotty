@@ -22,9 +22,29 @@ jobs:
         run: scripts/build-app.sh "${GITHUB_REF_NAME}"
       - name: Package DMG and ZIP
         run: scripts/make-dmg.sh
+      - name: Release notes
+        # Hand-written notes live in docs/release-notes/<tag>.md; otherwise GitHub lists the merged changes.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if [[ ! -f "$NOTES" ]]; then
+            NOTES=build/notes.md
+            gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" -f tag_name="${GITHUB_REF_NAME}" -q .body > "$NOTES"
+          fi
+          echo "NOTES=$NOTES" >> "$GITHUB_ENV"
+      - name: Update feed
+        # Signs the ZIP with the update key so installed copies accept it, then writes appcast.xml.
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$SPARKLE_PRIVATE_KEY" ]]; then echo "::error::SPARKLE_PRIVATE_KEY secret is missing"; exit 1; fi
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle.key"
+          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle.key" scripts/make-appcast.sh "${GITHUB_REF_NAME}" "$NOTES"
+          rm -f "$RUNNER_TEMP/sparkle.key"
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" dist/Screenshotty.dmg dist/Screenshotty.zip \
-            --title "Screenshotty ${GITHUB_REF_NAME}" --generate-notes
+          gh release create "${GITHUB_REF_NAME}" dist/Screenshotty.dmg dist/Screenshotty.zip dist/appcast.xml \
+            --title "Screenshotty ${GITHUB_REF_NAME}" --notes-file "$NOTES"

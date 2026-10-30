@@ -17,6 +17,11 @@
     <key>LSApplicationCategoryType</key><string>public.app-category.graphics-design</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSHumanReadableCopyright</key><string>MIT License. Free and open source.</string>
+    <!-- Auto-updates (Sparkle). The feed is attached to each GitHub release, so "latest" always points at
+         the newest one. Updates must be signed with the private half of SUPublicEDKey. -->
+    <key>SUFeedURL</key><string>https://github.com/harrison-bbb/screenshotty/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key><string>Q7w6rCEdrD7+aKJvTiLAllu5r9FsjNTt57a6bVANcNk=</string>
+    <key>SUEnableAutomaticChecks</key><true/>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

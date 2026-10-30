@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Screenshotty: beautiful screenshots for macOS</title>
+<meta name="description" content="Free, open-source Mac app that turns screenshots into polished, perfectly centred product shots. Smart capture, backgrounds, device mockups and automatic redaction.">
+<meta property="og:title" content="Screenshotty">
+<meta property="og:description" content="Beautiful, perfectly centred screenshots for macOS. Free and open source.">
+<meta property="og:image" content="https://harrison-bbb.github.io/screenshotty/images/example-mesh.png">
+<link rel="icon" href="images/icon.png">
+<style>
+  :root {
+    --bg: #fbfaff; --surface: #ffffff; --ink: #1d1b2e; --muted: #5d5a73; --line: rgba(29,27,46,.1);
+    --accent: #5b4bdb; --accent-ink: #ffffff; --accent-soft: #eeebff; --code: #f3f1fa; --glow-a: #d9d3ff; --glow-b: #ffe0d3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121019; --surface: #1c1926; --ink: #f2f0fa; --muted: #a9a5bd; --line: rgba(255,255,255,.1);
+      --accent: #8b7dff; --accent-ink: #120f22; --accent-soft: #262040; --code: #221e2f; --glow-a: #2c2552; --glow-b: #3a2423;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    background-image: radial-gradient(900px 500px at 15% -10%, var(--glow-a), transparent 70%),
+                      radial-gradient(800px 500px at 100% 10%, var(--glow-b), transparent 70%);
+    background-repeat: no-repeat;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+  nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; color: var(--ink); text-decoration: none; }
+  nav .brand img { width: 30px; height: 30px; }
+  nav .links a { color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 15px; }
+  nav .links a:hover { color: var(--ink); }
+
+  .hero { text-align: center; padding: 56px 0 28px; }
+  .hero img.icon { width: 112px; height: 112px; filter: drop-shadow(0 12px 24px rgba(91,75,219,.25)); }
+  h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.05; letter-spacing: -.03em; margin: 18px 0 14px; }
+  .lede { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 620px; margin: 0 auto 30px; }
+  .download {
+    display: inline-flex; align-items: center; gap: 10px; padding: 15px 28px; border-radius: 14px;
+    background: var(--accent); color: var(--accent-ink); font-size: 18px; font-weight: 600; text-decoration: none;
+    box-shadow: 0 10px 30px rgba(91,75,219,.35); transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .download:hover { transform: translateY(-1px); box-shadow: 0 14px 36px rgba(91,75,219,.42); }
+  .download svg { width: 20px; height: 20px; }
+  .meta { color: var(--muted); font-size: 14px; margin-top: 14px; }
+  .alt { color: var(--muted); font-size: 14px; margin-top: 6px; }
+  .shot { margin: 44px auto 0; max-width: 940px; }
+  .shot img { width: 100%; height: auto; border-radius: 14px; box-shadow: 0 30px 80px rgba(29,27,46,.22); display: block; }
+
+  section { padding: 64px 0 8px; }
+  h2 { font-size: clamp(26px, 3.6vw, 34px); letter-spacing: -.02em; margin: 0 0 10px; text-align: center; }
+  .sub { color: var(--muted); text-align: center; max-width: 600px; margin: 0 auto 32px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: step; }
+  .step { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .step::before {
+    counter-increment: step; content: counter(step); display: inline-grid; place-items: center;
+    width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+    font-weight: 700; font-size: 14px; margin-bottom: 10px;
+  }
+  .step h3 { margin: 0 0 6px; font-size: 17px; }
+  .step p { margin: 0; color: var(--muted); font-size: 15px; }
+  .mock {
+    margin-top: 14px; border-radius: 10px; background: var(--code); padding: 12px 14px; font-size: 13px; color: var(--muted);
+  }
+  .mock b { color: var(--ink); }
+  .mock .btn { display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .note { text-align: center; color: var(--muted); font-size: 14px; margin-top: 18px; }
+
+  .terminal { max-width: 760px; margin: 0 auto; }
+  .cmd {
+    display: flex; align-items: center; gap: 10px; background: var(--code); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 12px 12px 16px; margin-bottom: 12px;
+  }
+  .cmd code { flex: 1; overflow-x: auto; white-space: nowrap; font: 13.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
+  .cmd button {
+    flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px;
+    padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .cmd-label { font-size: 14px; font-weight: 600; margin: 18px 0 8px; }
+
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .feature { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; }
+  .feature h3 { margin: 0 0 6px; font-size: 16px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .gallery img { width: 100%; height: auto; border-radius: 12px; box-shadow: 0 16px 40px rgba(29,27,46,.16); display: block; }
+
+  .cta { text-align: center; padding: 72px 0 40px; }
+  footer { border-top: 1px solid var(--line); padding: 26px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 760px) {
+    .steps, .features, .gallery { grid-template-columns: 1fr; }
+    nav .links a:not(.gh) { display: none; }
+    .hero { padding-top: 32px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="./"><img src="images/icon.png" alt="">Screenshotty</a>
+    <div class="links">
+      <a href="#install">Install</a>
+      <a href="#features">Features</a>
+      <a class="gh" href="https://github.com/harrison-bbb/screenshotty">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <img class="icon" src="images/icon.png" alt="Screenshotty icon">
+    <h1>Beautiful screenshots,<br>in one shortcut.</h1>
+    <p class="lede">Screenshotty turns any capture into a polished, perfectly centred product shot, with backgrounds, device mockups and secrets hidden automatically. Free and open source.</p>
+    <a class="download" href="https://github.com/harrison-bbb/screenshotty/releases/latest/download/Screenshotty.dmg">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.53 2.66-.39 6.6 1.1 8.75.73 1.05 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.4 1.2-2.46-.03-.01-2.3-.88-2.3-3.52zM14.2 6.12c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.64-1.05 1.67-.92 2.66.97.08 1.96-.49 2.56-1.21z"/></svg>
+      Download for macOS
+    </a>
+    <div class="meta"><span id="version">Latest version</span> · macOS 14 or later · Apple Silicon and Intel</div>
+    <div class="alt">Updates install themselves. Prefer Terminal? <a href="#install">One-line install</a>.</div>
+    <div class="shot"><img src="images/example-mesh.png" alt="A dashboard screenshot on a blue mesh background inside a dark window frame" width="1400" height="878"></div>
+  </header>
+
+  <section id="install">
+    <h2>Installing takes a minute</h2>
+    <p class="sub">Screenshotty is free, so it isn't signed through Apple's paid developer program. macOS asks you to confirm it once; after that it opens like any other app.</p>
+    <div class="steps">
+      <div class="step">
+        <h3>Drag it into Applications</h3>
+        <p>Open the downloaded <b>Screenshotty.dmg</b> and drag the icon onto the Applications folder.</p>
+      </div>
+      <div class="step">
+        <h3>Open it, then click Done</h3>
+        <p>macOS says it can't verify Screenshotty. That's expected for free apps.</p>
+        <div class="mock"><b>"Screenshotty" Not Opened</b><br>Apple could not verify… <br><span class="btn">Done</span></div>
+      </div>
+      <div class="step">
+        <h3>Click Open Anyway</h3>
+        <p>In <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</p>
+        <div class="mock">"Screenshotty" was blocked to protect your Mac.<br><span class="btn">Open Anyway</span></div>
+      </div>
+    </div>
+    <p class="note">You only do this once. New versions arrive with a notification and install with one click.</p>
+
+    <div class="terminal">
+      <div class="cmd-label">Or skip the warning: install from Terminal</div>
+      <div class="cmd"><code id="curl">curl -fsSL https://raw.githubusercontent.com/harrison-bbb/screenshotty/main/scripts/install.sh | bash</code><button data-copy="curl">Copy</button></div>
+      <div class="cmd-label">Homebrew</div>
+      <div class="cmd"><code id="brew">brew tap harrison-bbb/screenshotty https://github.com/harrison-bbb/screenshotty &amp;&amp; brew install --cask screenshotty</code><button data-copy="brew">Copy</button></div>
+    </div>
+  </section>
+
+  <section id="features">
+    <h2>Everything a screenshot needs</h2>
+    <p class="sub">Press ⌘⇧2, click what you want, and it's already styled.</p>
+    <div class="features">
+      <div class="feature"><h3>Smart selection</h3><p>The selection locks onto the paragraph, panel, button or window under your pointer, including sections of web pages.</p></div>
+      <div class="feature"><h3>Never leak a secret</h3><p>Emails, API keys, tokens, card numbers and IPs are found on your Mac and hidden in one click, or automatically.</p></div>
+      <div class="feature"><h3>Fixes sloppy captures</h3><p>Stray slivers and cut-off content are trimmed, margins evened out, and the result centred to the pixel.</p></div>
+      <div class="feature"><h3>Mockups and frames</h3><p>Safari-style browser windows, a MacBook or an iPhone with their real screen shapes, light or dark.</p></div>
+      <div class="feature"><h3>Styles for every network</h3><p>One-click looks with exact sizes for X, LinkedIn, Instagram, launches and docs. Save and share your own.</p></div>
+      <div class="feature"><h3>Built for teams</h3><p>Brand kit watermark, shared team style folders and re-editable project files, all free.</p></div>
+      <div class="feature"><h3>Smart backgrounds</h3><p>Gradients, mesh wallpapers, your own images, or a background generated from your screenshot's colours.</p></div>
+      <div class="feature"><h3>Annotations</h3><p>Arrows, boxes, text, numbered steps, blur and redact that stay attached to your content.</p></div>
+      <div class="feature"><h3>Fast export</h3><p>⌘C to copy, ⌘S to save, or drag the preview straight into Slack, X, Figma or Finder.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="gallery">
+      <img src="images/example-square.png" alt="A square export on a peach gradient with a light window frame" width="900" height="900" loading="lazy">
+      <img src="images/example-gradient.png" alt="A screenshot on a colourful gradient background" width="1400" height="787" loading="lazy">
+    </div>
+  </section>
+
+  <section class="cta">
+    <h2>Make your next screenshot look great</h2>
+    <p class="sub">Free forever, open source under the MIT licence.</p>
+    <a class="download" href="https://github.com/harrison-bbb/screenshotty/releases/latest/download/Screenshotty.dmg">Download for macOS</a>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>Screenshotty is free and open source (MIT).</span>
+    <span><a href="https://github.com/harrison-bbb/screenshotty">Source code</a> · <a href="https://github.com/harrison-bbb/screenshotty/releases">Release notes</a> · <a href="https://github.com/harrison-bbb/screenshotty/issues">Report a problem</a></span>
+  </div>
+</footer>
+
+<script>
+  // Show the current version next to the download button.
+  fetch("https://api.github.com/repos/harrison-bbb/screenshotty/releases/latest")
+    .then(r => r.ok ? r.json() : null)
+    .then(r => { if (r && r.tag_name) document.getElementById("version").textContent = "Version " + r.tag_name.replace(/^v/, ""); })
+    .catch(() => {});
+  document.querySelectorAll("[data-copy]").forEach(button => {
+    button.addEventListener("click", () => {
+      navigator.clipboard.writeText(document.getElementById(button.dataset.copy).textContent).then(() => {
+        button.textContent = "Copied";
+        setTimeout(() => { button.textContent = "Copy"; }, 1500);
+      });
+    });
+  });
+</script>
+</body>
+</html>

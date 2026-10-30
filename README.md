@@ -10,6 +10,11 @@
 </p>
 
 <p align="center">
+  <a href="https://harrison-bbb.github.io/screenshotty/"><b>Download for macOS</b></a> ·
+  <a href="https://harrison-bbb.github.io/screenshotty/">Website</a>
+</p>
+
+<p align="center">
   <img src="docs/images/example-mesh.png" alt="A dashboard screenshot on a blue mesh background with a dark window frame">
 </p>
 
@@ -51,6 +56,8 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 ## Install
 
 Requires macOS 14 Sonoma or later. Works on Apple Silicon and Intel Macs.
+Once installed, Screenshotty keeps itself up to date: when a new version is out you get a notification,
+and one click installs it (Settings → "Tell me when there's an update", or **Check for Updates…** in the menu).
 
 ### Option 1: one-line install (easiest)
 
@@ -69,7 +76,7 @@ brew install --cask screenshotty
 
 ### Option 3: download
 
-1. Download **Screenshotty.dmg** from the [latest release](https://github.com/harrison-bbb/screenshotty/releases/latest).
+1. Download **Screenshotty.dmg** from the [website](https://harrison-bbb.github.io/screenshotty/) or the [latest release](https://github.com/harrison-bbb/screenshotty/releases/latest).
 2. Drag Screenshotty into Applications.
 3. Open it. Screenshotty is free and isn't signed with a paid Apple Developer certificate, so macOS will warn you the first time. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
 

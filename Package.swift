@@ -7,6 +7,10 @@ let package = Package(
     products: [
         .executable(name: "Screenshotty", targets: ["Screenshotty"]),
     ],
+    dependencies: [
+        // Auto-updates. Updates are verified with our own EdDSA key, so no paid Apple account is needed.
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.10.1"),
+    ],
     targets: [
         .target(
             name: "ScreenshottyCore",
@@ -14,7 +18,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "Screenshotty",
-            dependencies: ["ScreenshottyCore"],
+            dependencies: ["ScreenshottyCore", .product(name: "Sparkle", package: "Sparkle")],
             path: "Sources/Screenshotty"
         ),
         .testTarget(
