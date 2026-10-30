@@ -69,6 +69,40 @@ final class RegionDetector: @unchecked Sendable {
             abs(a.maxX - b.maxX) <= tolerance && abs(a.maxY - b.maxY) <= tolerance
     }
 
+    // MARK: Web pages in Chromium browsers and Electron apps
+
+    private static let webLock = NSLock()
+    nonisolated(unsafe) private static var webEnabled = Set<pid_t>()
+
+    /// Chrome, Arc, Brave, Edge and other Chromium browsers, and Electron apps (Slack, Notion, VS Code…),
+    /// only build the accessibility tree of their web content when an assistive app asks for it. Without
+    /// it a page is one big block. This asks each visible app once, as the picker opens.
+    func enableWebStructure() {
+        guard canReadElements else { return }
+        for pid in Set(windows.map(\.pid)) {
+            Self.webLock.lock()
+            let done = !Self.webEnabled.insert(pid).inserted
+            Self.webLock.unlock()
+            if done { continue }
+            let app = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(app, 0.2)
+            // The flag Chromium and Electron provide for this.
+            let manual = AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+            // Older Chromium builds only listen to the general flag VoiceOver sets; only used as a fallback,
+            // and only for browsers, because some apps animate windows differently while it's on.
+            if manual != .success, Self.isChromiumBrowser(pid) {
+                AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+            }
+        }
+    }
+
+    private static func isChromiumBrowser(_ pid: pid_t) -> Bool {
+        guard let id = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier else { return false }
+        return ["com.google.Chrome", "company.thebrowser.Browser", "com.brave.Browser", "com.microsoft.edgemac",
+                "com.vivaldi.Vivaldi", "com.operasoftware.Opera", "org.chromium.Chromium", "com.google.Chrome.canary"]
+            .contains { id.hasPrefix($0) }
+    }
+
     // MARK: Accessibility
 
     /// The elements under `point`, smallest first, and the frame of the window they're in.

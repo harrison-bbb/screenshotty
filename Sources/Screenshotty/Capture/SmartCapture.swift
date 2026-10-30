@@ -28,6 +28,7 @@ final class SmartCapture {
         let windows = ScreenFreezer.windows()
         guard let screens = try? await ScreenFreezer.freeze(), !screens.isEmpty else { return nil }
         let detector = RegionDetector(windows: windows)
+        DispatchQueue.global(qos: .userInitiated).async { detector.enableWebStructure() }
         let capture = SmartCapture(screens: screens, detector: detector)
         active = capture
         for screen in screens {
