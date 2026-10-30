@@ -58,8 +58,8 @@ then add a row to the styles table in `docs/composition-format.md`. The CLI pick
 
 ## Releasing
 
-1. Optionally write the release notes in `docs/release-notes/v0.7.0.md` (Markdown). Without one, GitHub lists the changes.
-2. Push a tag like `v0.7.0`.
+1. Optionally write the release notes in `docs/release-notes/v1.1.0.md` (Markdown). Without one, GitHub lists the changes.
+2. Push a tag like `v1.1.0`.
 
 GitHub Actions builds a universal app, packages the DMG and ZIP, signs the ZIP with the update key and publishes
 a release with `appcast.xml`, the feed installed copies check for updates. The website, Homebrew cask and install
