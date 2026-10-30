@@ -118,3 +118,17 @@ enum Docs {
         return (try? JSONSerialization.jsonObject(with: data)) != nil
     }
 }
+
+import ImageIO
+import UniformTypeIdentifiers
+
+extension TestImages {
+    /// JPEG data for `image` tagged with an EXIF orientation (6 = shown rotated 90° clockwise).
+    static func jpeg(_ image: CGImage, orientation: Int) -> Data {
+        let data = NSMutableData()
+        let dest = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(dest, image, [kCGImagePropertyOrientation: orientation] as CFDictionary)
+        CGImageDestinationFinalize(dest)
+        return data as Data
+    }
+}

@@ -29,6 +29,12 @@ enum CLI {
             return i < args.count ? args[i] : nil
         }
 
+        /// The next argument as a finite number inside `range` ("nan" and "inf" parse as Doubles).
+        func number(in range: ClosedRange<Double>) -> Double? {
+            guard let v = value().flatMap(Double.init), v.isFinite, range.contains(v) else { return nil }
+            return v
+        }
+
         while i < args.count {
             let arg = args[i]
             switch arg {
@@ -62,10 +68,10 @@ enum CLI {
                 }
                 settings.aspectRatio = aspect
             case "--padding":
-                guard let v = value().flatMap(Double.init) else { return fail("Invalid padding") }
+                guard let v = number(in: CompositionSettings.paddingRange) else { return fail("Padding must be 0 to 300") }
                 settings.padding = v
             case "--radius":
-                guard let v = value().flatMap(Double.init) else { return fail("Invalid radius") }
+                guard let v = number(in: CompositionSettings.cornerRadiusRange) else { return fail("Radius must be 0 to 60") }
                 settings.cornerRadius = v
             case "--shadow":
                 guard let v = value().flatMap(ShadowStyle.init(rawValue:)) else { return fail("Invalid shadow") }
@@ -118,7 +124,7 @@ enum CLI {
             case "--no-trim": settings.autoTrim = false
             case "--no-upscale": upscale = false
             case "--inner":
-                guard let v = value().flatMap(Double.init) else { return fail("Invalid inner margin") }
+                guard let v = number(in: CompositionSettings.innerPaddingRange) else { return fail("Inner margin must be 0 to 150") }
                 settings.innerPadding = v
             case "-h", "--help":
                 print(usage)

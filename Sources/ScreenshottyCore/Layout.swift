@@ -205,6 +205,13 @@ public struct CompositionLayout: Equatable, Sendable {
             screen = CGSize(width: w, height: (w / aspect).rounded())
             statusBar = (w * barShare).rounded()
             cardOffset = CGPoint(x: (w - cardW) / 2, y: statusBar)
+        } else if landscape {
+            // Like iOS's landscape safe area (59 pt of 393 each side), keep clear of the Dynamic Island.
+            // The safe area scales with the screen's height, which itself follows from the width.
+            let safeShare: CGFloat = 59.0 / 393.0
+            let width = max(cardW / (1 - 2 * safeShare / aspect), cardH * aspect)
+            screen = containing(CGSize(width: width.rounded(.up), height: cardH), aspect: aspect)
+            cardOffset = CGPoint(x: (screen.width - cardW) / 2, y: (screen.height - cardH) / 2)
         } else {
             screen = fits ? CGSize(width: cardW, height: cardH) : containing(CGSize(width: cardW, height: cardH), aspect: aspect)
             cardOffset = CGPoint(x: (screen.width - cardW) / 2, y: (screen.height - cardH) / 2)

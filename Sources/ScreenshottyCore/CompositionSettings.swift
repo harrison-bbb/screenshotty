@@ -265,5 +265,19 @@ public struct CompositionSettings: Codable, Hashable, Sendable {
         device = (try? c.decode(DeviceStyle.self, forKey: .device)) ?? d.device
         exportWidth = try? c.decode(Int.self, forKey: .exportWidth)
         watermark = try? c.decode(Watermark.self, forKey: .watermark)
+        // Style and project files are shared between people: keep their numbers in the supported ranges,
+        // so a typo (or a hostile file) can't produce a 40,000 px canvas or hang the renderer.
+        padding = Self.clamp(padding, to: Self.paddingRange, default: d.padding)
+        cornerRadius = Self.clamp(cornerRadius, to: Self.cornerRadiusRange, default: d.cornerRadius)
+        innerPadding = Self.clamp(innerPadding, to: Self.innerPaddingRange, default: d.innerPadding)
+        exportWidth = exportWidth.map { min(max($0, Self.exportWidthRange.lowerBound), Self.exportWidthRange.upperBound) }
+    }
+
+    /// Exact export widths accepted from files and the command line, in pixels.
+    public static let exportWidthRange: ClosedRange<Int> = 100...8000
+
+    /// `value` limited to `range`; NaN and infinity become `fallback`.
+    public static func clamp(_ value: Double, to range: ClosedRange<Double>, default fallback: Double) -> Double {
+        value.isFinite ? min(max(value, range.lowerBound), range.upperBound) : fallback
     }
 }

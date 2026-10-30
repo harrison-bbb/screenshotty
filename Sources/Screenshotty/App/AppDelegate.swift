@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var captureMenuItem: NSMenuItem!
     private var updateMenuItem: NSMenuItem!
+    private var checkUpdatesMenuItem: NSMenuItem!
     private let updateSeparator = NSMenuItem.separator()
     private var cancellables = Set<AnyCancellable>()
     private var isCapturing = false
@@ -151,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(withTitle: "Import Style…", action: #selector(importStyle), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
-        menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        checkUpdatesMenuItem = menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(withTitle: "Screenshotty on GitHub", action: #selector(openRepository), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Screenshotty", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -177,9 +178,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateMenuItem.title = version.map { "Update to Screenshotty \($0)…" } ?? ""
         updateMenuItem.isHidden = version == nil
         updateSeparator.isHidden = version == nil
-        if let item = menu.items.first(where: { $0.action == #selector(checkForUpdates) }) {
-            item.isHidden = !Updater.shared.isAvailable
-        }
+        // By reference: the update reminder above shares this item's selector name.
+        checkUpdatesMenuItem.isHidden = !Updater.shared.isAvailable
         if let item = menu.items.first(where: { $0.action == #selector(openFromClipboard) }) {
             item.isEnabled = Self.clipboardImage() != nil
         }
@@ -226,8 +226,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func startCapture(_ mode: CaptureMode) {
         guard !isCapturing else { return }
-        guard ensureScreenRecordingPermission() else { return }
+        // Claimed before the permission check: its alert is modal, and the shortcut can fire again under it.
         isCapturing = true
+        guard ensureScreenRecordingPermission() else { isCapturing = false; return }
         Task { @MainActor in
             defer { isCapturing = false }
             // Smart selection when chosen; the system picker if it's off or can't start.
@@ -253,31 +254,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             QuickPreviewManager.shared.show(image)
         case .openEditor:
             WindowManager.shared.openEditor(with: image)
-        case .copy:
-            guard let output = try? Compositor.compose(image, settings: prefs.lastSettings,
-                                                       annotations: Self.autoHideAnnotations(for: image),
-                                                       minimumLongSide: prefs.exportMinimumLongSide) else { return }
-            Exporter.copyToPasteboard(output)
-            Toast.show("Copied to clipboard")
-        case .save:
-            guard let output = try? Compositor.compose(image, settings: prefs.lastSettings,
-                                                       annotations: Self.autoHideAnnotations(for: image),
-                                                       minimumLongSide: prefs.exportMinimumLongSide) else { return }
-            do {
-                let url = try Exporter.save(output, in: prefs.saveFolder)
-                Toast.show("Saved to \(url.deletingLastPathComponent().lastPathComponent)")
-            } catch {
-                NSApp.activate(ignoringOtherApps: true)
-                NSAlert(error: error).runModal()
+        case .copy, .save:
+            let copy = prefs.afterCapture == .copy
+            let settings = prefs.lastSettings
+            let hideKind: Annotation.Kind? = prefs.autoHideSensitive ? prefs.sensitiveHideKind : nil
+            let minimumLongSide = prefs.exportMinimumLongSide
+            // Text recognition and rendering take a moment on big Retina captures; keep the app responsive.
+            Task {
+                let output = await Task.detached(priority: .userInitiated) { () -> CGImage? in
+                    let marks = hideKind.map { kind in SensitiveScanner.scan(image).map { $0.annotation(kind) } } ?? []
+                    return try? Compositor.compose(image, settings: settings, annotations: marks, minimumLongSide: minimumLongSide)
+                }.value
+                guard let output else {
+                    Toast.show("Couldn't create the image", systemImage: "exclamationmark.triangle.fill")
+                    return
+                }
+                if copy {
+                    Exporter.copyToPasteboard(output)
+                    Toast.show("Copied to clipboard")
+                    return
+                }
+                do {
+                    let url = try Exporter.save(output, in: prefs.saveFolder)
+                    Toast.show("Saved to \(url.deletingLastPathComponent().lastPathComponent)")
+                } catch {
+                    NSApp.activate(ignoringOtherApps: true)
+                    NSAlert(error: error).runModal()
+                }
             }
         }
-    }
-
-    /// Covers sensitive info when auto-hide is on (used by the paths that skip the editor).
-    static func autoHideAnnotations(for image: CGImage) -> [Annotation] {
-        let prefs = Preferences.shared
-        guard prefs.autoHideSensitive else { return [] }
-        return SensitiveScanner.scan(image).map { $0.annotation(prefs.sensitiveHideKind) }
     }
 
     /// Shown when macOS hands back an empty image even though permission looks granted.

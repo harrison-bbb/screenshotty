@@ -14,6 +14,8 @@ final class SmartCapture {
     private let detectQueue = DispatchQueue(label: "screenshotty.detect", qos: .userInteractive)
     private var detecting = false
     private var pendingPoint: CGPoint?
+    /// The overlay that asked for `pendingPoint` (one per display); results go back to it.
+    private weak var pendingView: OverlayView?
     var windowsOnly = false
 
     private init(screens: [FrozenScreen], detector: RegionDetector) {
@@ -69,12 +71,15 @@ final class SmartCapture {
 
     func detect(at point: CGPoint, for view: OverlayView) {
         pendingPoint = point
+        pendingView = view
+        // Only the display under the pointer shows a highlight (the others get no mouse events to clear it).
+        for overlay in overlays where overlay.overlayView !== view { overlay.overlayView.clearHighlight() }
         guard !detecting else { return }
-        runDetection(for: view)
+        runDetection()
     }
 
-    private func runDetection(for view: OverlayView) {
-        guard let point = pendingPoint else { return }
+    private func runDetection() {
+        guard let point = pendingPoint, let view = pendingView else { return }
         pendingPoint = nil
         detecting = true
         let windowsOnly = windowsOnly
@@ -84,8 +89,9 @@ final class SmartCapture {
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     self.detecting = false
-                    view.show(regions)
-                    if self.pendingPoint != nil { self.runDetection(for: view) }
+                    // Skip results for a display the pointer has already left.
+                    if self.pendingView === view { view.show(regions) }
+                    if self.pendingPoint != nil { self.runDetection() }
                 }
             }
         }
@@ -243,12 +249,23 @@ final class OverlayView: NSView {
 
     func pointerMoved(to windowPoint: CGPoint) {
         let point = convert(windowPoint, from: nil)
-        guard bounds.contains(point), dragRect == nil else { return }
+        guard dragRect == nil else { return }
+        guard bounds.contains(point) else { return }
+        // Keys (Return, Space, arrows) go to the display under the pointer.
+        if let window, !window.isKeyWindow {
+            window.makeKey()
+            window.makeFirstResponder(self)
+        }
         controller?.detect(at: global(point), for: self)
     }
 
     override func mouseMoved(with event: NSEvent) {
         pointerMoved(to: event.locationInWindow)
+    }
+
+    func clearHighlight() {
+        guard !regions.isEmpty, dragRect == nil else { return }
+        show([])
     }
 
     func show(_ regions: [DetectedRegion]) {

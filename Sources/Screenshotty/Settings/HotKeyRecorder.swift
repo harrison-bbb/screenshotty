@@ -46,6 +46,13 @@ struct HotKeyRecorder: View {
                     NSSound.beep()
                     return nil
                 }
+                // Keep listening (and the old shortcut) if macOS won't accept this one, e.g. Option-only combos.
+                guard HotKeyManager.shared.register(recorded) else {
+                    NSSound.beep()
+                    Toast.show("\(recorded.displayString) can't be used. Try one with ⌘ or ⌃.",
+                               systemImage: "exclamationmark.triangle.fill")
+                    return nil
+                }
                 hotKey = recorded
                 stopRecording()
             }

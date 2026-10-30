@@ -23,7 +23,7 @@ public enum Compositor {
         let scaleY = CGFloat(pixelH) / layout.canvasSize.height
 
         guard let ctx = CGContext(data: nil, width: pixelW, height: pixelH, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  space: CGColorSpace.working(for: source),
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
             throw CompositorError.contextCreationFailed
         }

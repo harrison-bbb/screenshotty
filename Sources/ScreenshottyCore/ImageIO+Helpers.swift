@@ -16,8 +16,20 @@ public enum ImageLoader {
     }
 
     public static func load(_ data: Data) -> CGImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        // Photos (phone JPEGs and HEICs) are often stored sideways with an EXIF orientation; turn them upright.
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        if let orientation = properties?[kCGImagePropertyOrientation] as? UInt32, orientation != 1,
+           let width = properties?[kCGImagePropertyPixelWidth] as? Int, let height = properties?[kCGImagePropertyPixelHeight] as? Int,
+           let upright = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+               kCGImageSourceCreateThumbnailFromImageAlways: true,
+               kCGImageSourceCreateThumbnailWithTransform: true,
+               kCGImageSourceThumbnailMaxPixelSize: max(width, height),
+               kCGImageSourceShouldCacheImmediately: true,
+           ] as CFDictionary) {
+            return decoded(upright) ?? upright
+        }
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
         else { return nil }
         return decoded(image) ?? image
     }
@@ -46,5 +58,14 @@ public enum PNGEncoder {
             throw CocoaError(.fileWriteUnknown)
         }
         try data.write(to: url, options: .atomic)
+    }
+}
+
+extension CGColorSpace {
+    /// The colour space to draw output in: the image's own RGB space (Mac captures are usually Display P3,
+    /// and converting to sRGB would dull vivid colours), or sRGB for anything else.
+    public static func working(for image: CGImage) -> CGColorSpace {
+        if let space = image.colorSpace, space.model == .rgb, space.supportsOutput { return space }
+        return CGColorSpace(name: CGColorSpace.sRGB)!
     }
 }

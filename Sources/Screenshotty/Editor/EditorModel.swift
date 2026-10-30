@@ -103,9 +103,21 @@ final class EditorModel: ObservableObject {
 
     /// Findings not yet covered by a blur or redact annotation.
     var visibleFindings: [SensitiveFinding] {
-        findings.filter { finding in
-            !annotations.contains { ($0.kind == .redact || $0.kind == .blur) && $0.rect.insetBy(dx: -2, dy: -2).contains(finding.rect) }
-        }
+        findings.filter { finding in !annotations.contains { Self.covers($0, finding) } }
+    }
+
+    private static func covers(_ mark: Annotation, _ finding: SensitiveFinding) -> Bool {
+        (mark.kind == .redact || mark.kind == .blur) && mark.rect.insetBy(dx: -2, dy: -2).contains(finding.rect)
+    }
+
+    /// Removes the blurs and bars covering sensitive findings, in one undoable step.
+    func showSensitive() {
+        let covering = annotations.filter { mark in findings.contains { Self.covers(mark, $0) } }
+        guard !covering.isEmpty else { return }
+        recordUndo()
+        let ids = Set(covering.map(\.id))
+        annotations.removeAll { ids.contains($0.id) }
+        if let selectedID, ids.contains(selectedID) { select(nil) }
     }
 
     /// Covers every visible finding in one undoable step, with the user's preferred blur or bar.
@@ -327,6 +339,8 @@ final class EditorModel: ObservableObject {
     }
 
     func beginText(at point: CGPoint) {
+        // Deselect, or colour and size changes made while typing would also restyle the last label.
+        selectedID = nil
         textEditing = TextEditing(id: nil, point: point, text: "")
     }
 
@@ -344,7 +358,8 @@ final class EditorModel: ObservableObject {
             guard annotations[index].text != text else { return }
             recordUndo()
             if text.isEmpty { annotations.remove(at: index); selectedID = nil } else { annotations[index].text = text }
-        } else if !text.isEmpty {
+        } else if editing.id == nil, !text.isEmpty {
+            // (A label deleted or undone while being edited stays gone.)
             add(Annotation(kind: .text, start: editing.point, end: editing.point, color: annotationColor,
                            text: text, size: textSize))
         }

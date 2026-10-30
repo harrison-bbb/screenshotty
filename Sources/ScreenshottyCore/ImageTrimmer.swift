@@ -284,7 +284,10 @@ public enum ShotPreparer {
     ///   sliders stay fast. Computed when nil.
     public static func prepareShot(_ source: CGImage, crop: CGRect? = nil, analysis: ShotAnalysis? = nil,
                                    settings: CompositionSettings) -> PreparedShot {
-        let cropRect = crop.map { $0.integral.intersection(CGRect(x: 0, y: 0, width: source.width, height: source.height)) }
+        // A crop that misses the image entirely (a stale or edited project file) is ignored, not half-applied.
+        let cropRect = crop
+            .map { $0.integral.intersection(CGRect(x: 0, y: 0, width: source.width, height: source.height)) }
+            .flatMap { $0.isNull || $0.width < 1 || $0.height < 1 ? nil : $0 }
         let working = cropRect.flatMap { source.cropping(to: $0) } ?? source
         var shot = PreparedShot(image: working, offset: .zero)
         if settings.autoTrim {
@@ -300,6 +303,12 @@ public enum ShotPreparer {
 
     /// Crops to the analysed content and adds the inner margin in the screenshot's background colour.
     static func trimmed(_ source: CGImage, analysis: ShotAnalysis, settings: CompositionSettings) -> PreparedShot {
+        // A nearly blank capture (a white page with one small mark) isn't "margins around content":
+        // trimming would shrink it to the mark. Keep it whole.
+        let longSide = CGFloat(max(source.width, source.height))
+        if max(analysis.contentRect.width, analysis.contentRect.height) < longSide * minimumContentShare {
+            return PreparedShot(image: source, offset: .zero)
+        }
         let content = ImageTrimmer.crop(source, to: analysis.contentRect)
         let cropOffset = CGPoint(x: -analysis.contentRect.minX, y: -analysis.contentRect.minY)
         guard let background = analysis.backgroundColor else { return PreparedShot(image: content, offset: cropOffset) }
@@ -314,11 +323,14 @@ public enum ShotPreparer {
         return PreparedShot(image: padded, offset: CGPoint(x: cropOffset.x + margin, y: cropOffset.y + margin))
     }
 
+    /// Content smaller than this share of the capture's long side is left untrimmed.
+    static let minimumContentShare: CGFloat = 0.1
+
     static func pad(_ image: CGImage, by margin: Int, color: RGBAColor) -> CGImage? {
         let width = image.width + margin * 2
         let height = image.height + margin * 2
         guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  space: CGColorSpace.working(for: image),
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         ctx.setFillColor(color.cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))

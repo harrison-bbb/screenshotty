@@ -210,6 +210,7 @@ struct WindowControl: View {
                     .font(.callout)
                     .focused($addressFocused)
                     .onChange(of: addressFocused) { _, focused in isTyping = focused }
+                    .onDisappear { isTyping = false }   // removed while focused: onChange never fires
             }
         }
     }
@@ -397,6 +398,7 @@ struct WatermarkControl: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($textFocused)
                 .onChange(of: textFocused) { _, focused in isTyping = focused }
+                .onDisappear { isTyping = false }   // removed while focused: onChange never fires
             VStack(alignment: .leading, spacing: 6) {
                 Text("Position").font(.callout)
                 CompactTabBar(selection: Binding(get: { mark.position }, set: { settings.watermark?.position = $0 }),

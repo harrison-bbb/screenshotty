@@ -47,8 +47,15 @@ extension AppDelegate {
                     let marks = autoHide ? SensitiveScanner.scan(image).map { $0.annotation(hideKind) } : []
                     guard let output = try? Compositor.compose(image, settings: settings, annotations: marks,
                                                                minimumLongSide: minimumLongSide) else { continue }
+                    // shot.png and shot.jpg (or same-named files from two folders) each get their own file.
                     let name = url.deletingPathExtension().lastPathComponent
-                    if (try? PNGEncoder.write(output, to: folder.appendingPathComponent(name).appendingPathExtension("png"))) != nil {
+                    var target = folder.appendingPathComponent(name).appendingPathExtension("png")
+                    var copy = 2
+                    while FileManager.default.fileExists(atPath: target.path) {
+                        target = folder.appendingPathComponent("\(name) \(copy)").appendingPathExtension("png")
+                        copy += 1
+                    }
+                    if (try? PNGEncoder.write(output, to: target)) != nil {
                         count += 1
                     }
                 }

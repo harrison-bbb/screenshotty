@@ -11,7 +11,7 @@ public enum AnnotationRenderer {
         let width = shot.width
         let height = shot.height
         guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  space: CGColorSpace.working(for: shot),
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return shot }
         ctx.translateBy(x: 0, y: CGFloat(height))
         ctx.scaleBy(x: 1, y: -1)

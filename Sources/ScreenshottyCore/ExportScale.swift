@@ -28,7 +28,7 @@ public enum ExportScale {
         let width = image.width * factor
         let height = image.height * factor
         guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  space: CGColorSpace.working(for: image),
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         ctx.interpolationQuality = .none
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))

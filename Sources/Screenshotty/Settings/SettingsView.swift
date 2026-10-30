@@ -138,6 +138,7 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             hasPermission = CaptureService.hasScreenRecordingPermission
             axTrusted = AXIsProcessTrusted()
+            launchAtLogin = SMAppService.mainApp.status == .enabled   // may have changed in System Settings
         }
     }
 
@@ -164,6 +165,8 @@ struct SettingsView: View {
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
+        // Nothing to do when the toggle only caught up with the real state (refresh, or a failed change reverting).
+        guard enabled != (SMAppService.mainApp.status == .enabled) else { return }
         do {
             if enabled {
                 try SMAppService.mainApp.register()

@@ -38,6 +38,9 @@ private struct CanvasView: View {
             let size = CGSize(width: canvas.width * scale, height: canvas.height * scale)
             let origin = CGPoint(x: insets.leading + (available.width - size.width) / 2,
                                  y: insets.top + (available.height - size.height) / 2)
+            // View points per layout-canvas pixel. The output can be larger than the layout (sharpened small
+            // shots, fixed export widths), so this differs from `scale`; annotations live in layout space.
+            let canvasScale = size.width / max(model.layout.canvasSize.width, 1)
 
             ZStack(alignment: .topLeading) {
                 Color(nsColor: .underPageBackgroundColor)
@@ -52,7 +55,7 @@ private struct CanvasView: View {
                 } else if model.showOriginal {
                     let source = CGSize(width: model.source.width, height: model.source.height)
                     // Same zoom as the finished preview, so the two compare like for like.
-                    let fit = min(scale, available.width / source.width, available.height / source.height)
+                    let fit = min(canvasScale, available.width / source.width, available.height / source.height)
                     let shown = CGSize(width: source.width * fit, height: source.height * fit)
                     Image(decorative: model.source, scale: 1)
                         .resizable()
@@ -79,7 +82,7 @@ private struct CanvasView: View {
                         .frame(width: size.width, height: size.height)
                         .offset(x: origin.x, y: origin.y)
 
-                    AnnotationOverlay(model: model, scale: scale)
+                    AnnotationOverlay(model: model, scale: canvasScale)
                         .frame(width: size.width, height: size.height)
                         .offset(x: origin.x, y: origin.y)
                 } else {
@@ -264,6 +267,8 @@ private struct SensitiveBanner: View {
                 if visible.isEmpty {
                     Label("Hidden: \(SensitiveFinding.summary(model.findings))", systemImage: "checkmark.shield.fill")
                         .foregroundStyle(.green)
+                    Button("Show") { model.showSensitive() }
+                        .help("Remove the covers from this screenshot")
                 } else {
                     Label("Found \(SensitiveFinding.summary(visible))", systemImage: "exclamationmark.shield.fill")
                         .foregroundStyle(.orange)
@@ -292,7 +297,8 @@ private struct SensitiveBanner: View {
             .background(.regularMaterial, in: Capsule())
             .overlay(Capsule().strokeBorder(Color.primary.opacity(0.1)))
             .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
-            .onChange(of: prefs.autoHideSensitive) { _, on in if on { model.hideSensitive() } }
+            // The switch acts on this screenshot too: on covers everything, off uncovers it again.
+            .onChange(of: prefs.autoHideSensitive) { _, on in on ? model.hideSensitive() : model.showSensitive() }
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }

@@ -42,9 +42,16 @@ struct BackgroundPickerView: View {
             }
         }
         .onAppear {
-            tab = smartVariant != nil ? .smart : Self.tab(for: background)
+            tab = currentTab
             if case .image(let spec) = background { lastImage = spec }
         }
+        // Follow changes made elsewhere (undo, a style card, Reset). Setting `tab` to the matching kind
+        // makes switchKind a no-op.
+        .onChange(of: background) { _, new in
+            tab = currentTab
+            if case .image(let spec) = new { lastImage = spec }
+        }
+        .onChange(of: smartVariant) { _, _ in tab = currentTab }
     }
 
     // MARK: Panels
@@ -215,6 +222,8 @@ struct BackgroundPickerView: View {
         case .none: background = .transparent
         }
     }
+
+    private var currentTab: Tab { smartVariant != nil ? .smart : Self.tab(for: background) }
 
     private static func tab(for background: BackgroundStyle) -> Tab {
         switch background {
