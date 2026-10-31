@@ -8,13 +8,13 @@ on:
 jobs:
   build-and-test:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v5
       - name: Swift version
         run: swift --version
       - name: Test
-        run: swift test
+        run: script -q /dev/null swift test
       - name: Build app bundle
         run: scripts/build-app.sh "0.0.0-ci"
       - name: Smoke-test the CLI renderer
