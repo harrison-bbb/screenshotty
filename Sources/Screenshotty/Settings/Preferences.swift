@@ -3,7 +3,7 @@ import Foundation
 import ScreenshottyCore
 
 enum AfterCaptureAction: String, CaseIterable, Identifiable {
-    case openEditor, quickPreview, copy, save
+    case openEditor, quickPreview, copy, save, pin
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -11,6 +11,7 @@ enum AfterCaptureAction: String, CaseIterable, Identifiable {
         case .openEditor: "Open the editor"
         case .copy: "Copy to clipboard instantly"
         case .save: "Save to folder instantly"
+        case .pin: "Pin it on screen (floats above other windows)"
         }
     }
 }
@@ -75,6 +76,18 @@ final class Preferences: ObservableObject {
     /// How sensitive info is hidden: a solid bar (`.redact`) or pixelation (`.blur`).
     @Published var sensitiveHideKind: Annotation.Kind {
         didSet { defaults.set(sensitiveHideKind.rawValue, forKey: "sensitiveHideKind") }
+    }
+
+    /// Extra words and phrases to hide (client names, internal domains…), as typed: commas or new lines between them.
+    @Published var hiddenWordsText: String {
+        didSet { defaults.set(hiddenWordsText, forKey: "hiddenWordsText") }
+    }
+
+    /// `hiddenWordsText` split into words, for the sensitive info scanner.
+    var hiddenWords: [String] {
+        hiddenWordsText.split(whereSeparator: { $0 == "," || $0.isNewline })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.count >= 2 }
     }
 
     /// Styles the user saved, newest last.
@@ -212,6 +225,7 @@ final class Preferences: ObservableObject {
         autoHideSensitive = defaults.bool(forKey: "autoHideSensitive")
         sensitiveHideKind = defaults.string(forKey: "sensitiveHideKind").flatMap(Annotation.Kind.init(rawValue:))
             .flatMap { $0 == .blur ? .blur : .redact } ?? .redact
+        hiddenWordsText = defaults.string(forKey: "hiddenWordsText") ?? ""
         savedStyles = Self.loadJSON([Style].self, key: "savedStyles", defaults: defaults) ?? []
         brandKit = Self.loadJSON(BrandKit.self, key: "brandKit", defaults: defaults) ?? BrandKit()
         teamStylesFolder = defaults.string(forKey: "teamStylesFolder").map { URL(fileURLWithPath: $0, isDirectory: true) }

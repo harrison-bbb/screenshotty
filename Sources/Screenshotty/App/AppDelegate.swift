@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if Snapshot.isRequested { return Snapshot.run() }
+        if ScrollTest.isRequested { return ScrollTest.run() }
         Log.write("launch \(Bundle.main.shortVersion) (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") ?? "?")) permission=\(CaptureService.hasScreenRecordingPermission)")
         NSApp.mainMenu = MainMenu.build()
         // Diagnostics: note every desktop (Space) switch and what's in front, to trace unexpected jumps.
@@ -33,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Load the on-device text recognition model now, so the first sensitive-info check is quick.
         Task.detached(priority: .utility) {
             SensitiveScanner.warmUp()
+            TextRecognizer.warmUp()
             RegionDetector.warmUp()
         }
         setUpStatusItem()
@@ -145,6 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateSeparator.isHidden = true
         captureMenuItem = menu.addItem(withTitle: "Capture Area or Window", action: #selector(captureInteractive), keyEquivalent: "")
         menu.addItem(withTitle: "Capture Full Screen", action: #selector(captureFullScreen), keyEquivalent: "")
+        menu.addItem(withTitle: "Capture Scrolling Area", action: #selector(captureScrolling), keyEquivalent: "")
+        menu.addItem(withTitle: "Capture Text", action: #selector(captureText), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Open Image…", action: #selector(openImage), keyEquivalent: "")
         menu.addItem(withTitle: "Open from Clipboard", action: #selector(openFromClipboard), keyEquivalent: "")
@@ -189,6 +193,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func captureInteractive() { startCapture(.interactive) }
     @objc func captureFullScreen() { startCapture(.fullScreen) }
+    /// Pick an area, then copy the text in it instead of the picture.
+    @objc func captureText() { startCapture(.interactive, forText: true) }
+
+    /// A page taller than the screen: pick the area, then scroll.
+    @objc func captureScrolling() {
+        guard !isCapturing else { return }
+        isCapturing = true
+        guard ensureScreenRecordingPermission() else { isCapturing = false; return }
+        Task { @MainActor in
+            defer { isCapturing = false }
+            switch await ScrollingCapture.run() {
+            case .image(let image): handleCaptured(image)
+            case .cancelled: break
+            case .blocked: showCaptureBlockedAlert()
+            }
+        }
+    }
 
     @objc func openImage() {
         NSApp.activate(ignoringOtherApps: true)
@@ -224,7 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Capture flow
 
-    func startCapture(_ mode: CaptureMode) {
+    func startCapture(_ mode: CaptureMode, forText: Bool = false) {
         guard !isCapturing else { return }
         // Claimed before the permission check: its alert is modal, and the shortcut can fire again under it.
         isCapturing = true
@@ -238,6 +259,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if result == nil { Log.write("smart capture unavailable, using the system picker") }
             }
             switch await result.asyncOr({ await CaptureService.capture(mode) }) {
+            case .image(let image) where forText:
+                TextCopier.copyText(from: image)
+                SmartCapture.captureHandled(openedWindow: false)
             case .image(let image):
                 handleCaptured(image)
                 // Only now let the picker's hidden overlay go, so focus never passes to another app.
@@ -254,15 +278,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             QuickPreviewManager.shared.show(image)
         case .openEditor:
             WindowManager.shared.openEditor(with: image)
+        case .pin:
+            PinnedImages.pin(image)
         case .copy, .save:
             let copy = prefs.afterCapture == .copy
             let settings = prefs.lastSettings
             let hideKind: Annotation.Kind? = prefs.autoHideSensitive ? prefs.sensitiveHideKind : nil
             let minimumLongSide = prefs.exportMinimumLongSide
+            let words = prefs.hiddenWords
             // Text recognition and rendering take a moment on big Retina captures; keep the app responsive.
             Task {
                 let output = await Task.detached(priority: .userInitiated) { () -> CGImage? in
-                    let marks = hideKind.map { kind in SensitiveScanner.scan(image).map { $0.annotation(kind) } } ?? []
+                    let marks = hideKind.map { kind in SensitiveScanner.scan(image, customWords: words).map { $0.annotation(kind) } } ?? []
                     return try? Compositor.compose(image, settings: settings, annotations: marks, minimumLongSide: minimumLongSide)
                 }.value
                 guard let output else {

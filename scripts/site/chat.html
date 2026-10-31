@@ -1,0 +1,53 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#fff;font:15px/1.6 -apple-system,system-ui;color:#1d1b26}
+header{position:sticky;top:0;background:rgba(255,255,255,.96);border-bottom:1px solid #ece9f3;padding:14px 28px;font-weight:600;display:flex;gap:10px;align-items:center}
+header i{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,#6a5cff,#c46cf0);display:inline-block}
+main{max-width:640px;margin:0 auto;padding:24px 28px 120px}
+.me{background:#f1effa;border-radius:16px;padding:12px 16px;margin:22px 0 18px auto;max-width:80%;width:fit-content}
+h3{margin:22px 0 6px;font-size:16px} p{margin:8px 0} li{margin:4px 0}
+pre{background:#17151f;color:#e9e6f5;border-radius:10px;padding:14px 16px;font:13px/1.5 ui-monospace,Menlo;overflow:hidden}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px} td,th{border:1px solid #e6e3ef;padding:7px 10px;text-align:left} th{background:#f7f6fb}
+.tip{border-left:3px solid #6a5cff;background:#f6f4ff;padding:10px 14px;border-radius:6px}
+footer{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #ece9f3;padding:12px 28px}
+footer div{border:1px solid #dcd8e8;border-radius:12px;padding:10px 14px;color:#9a96aa;max-width:640px;margin:0 auto}
+</style></head><body>
+<header><i></i> Launch plan</header>
+<main>
+<div class="me">Can you turn my notes into a launch plan for the Northwind dashboard? We ship on the 14th.</div>
+<p>Here's a plan built around a two-week runway. It front-loads the things that take longest (assets and early access) and keeps launch day itself simple.</p>
+<h3>1. Two weeks out: get the story straight</h3>
+<ul><li>Write a one-line pitch and test it on five customers.</li><li>List the three screenshots that explain the product best.</li><li>Pick one metric to lead with: time saved per weekly report.</li><li>Draft the changelog entry and the launch email.</li></ul>
+<h3>2. Ten days out: build the assets</h3>
+<p>Capture clean screenshots of the overview, the revenue chart and the customer table. Keep the same background and frame on all of them so the launch reads as one piece.</p>
+<table><tr><th>Asset</th><th>Size</th><th>Owner</th></tr><tr><td>X post images</td><td>1600 × 900</td><td>Maya</td></tr><tr><td>LinkedIn post</td><td>1200 × 627</td><td>Leo</td></tr><tr><td>Product page hero</td><td>2400 × 1350</td><td>Maya</td></tr><tr><td>Docs screenshots</td><td>Any</td><td>Priya</td></tr></table>
+<h3>3. One week out: early access</h3>
+<p>Invite your twenty most active customers. Ask each for one sentence you can quote, and fix anything that confuses more than two of them.</p>
+<div class="tip">Send invites on a Tuesday morning. Replies come back fastest early in the week.</div>
+<h3>4. Launch day</h3>
+<ol><li>9:00: publish the changelog and product page.</li><li>9:15: send the email to all customers.</li><li>9:30: post on X and LinkedIn with the screenshots.</li><li>All day: answer every reply within an hour.</li></ol>
+<h3>5. Track it</h3>
+<p>Add a small snippet so you can see sign-ups from each channel:</p>
+<pre>track("launch_signup", {
+  source: utm.source ?? "direct",
+  plan: account.plan,
+  referrer: document.referrer
+})</pre>
+<h3>6. The week after</h3>
+<ul><li>Share the numbers with the team on Friday.</li><li>Turn the three best customer quotes into a short post.</li><li>Write down what you'd change for the next launch while it's fresh.</li></ul>
+<div class="me">Perfect. Can you make the launch email shorter?</div>
+<p>Here's a version that fits on one phone screen:</p>
+<pre>Subject: Your weekly report, in 30 seconds
+
+The new Northwind dashboard puts revenue,
+churn and your top customers on one page.
+No more stitching reports together on Monday.
+
+It's live in your account now.
+→ Open your dashboard</pre>
+<p>It keeps the one promise (less time on reports), one proof point and one button. Anything longer gets skimmed.</p>
+<h3>Checklist</h3>
+<ul><li>Screenshots captured and styled</li><li>Early access feedback in</li><li>Email scheduled for 9:15</li><li>Posts drafted for X and LinkedIn</li><li>Someone on replies all day</li></ul>
+<p>Good luck with the launch. Send me the numbers afterwards and I'll help you write the follow-up.</p>
+</main>
+<footer><div>Reply…</div></footer>
+</body></html>

@@ -29,7 +29,10 @@ Screenshotty turns them into the kind of polished product shots you see SaaS fou
 - **Built for teams.** A brand kit (logo, name, colours) puts a watermark on every image. Share any style as a
   `.screenshotty-style` file, or point everyone at a shared folder of team styles. Save `.screenshotty` projects
   that reopen with the crop, annotations and style still editable, so docs screenshots are easy to update.
-- **Never leak a secret.** Emails, API keys, tokens, card and phone numbers and IP addresses are found on your Mac (nothing is uploaded) and hidden in one click, with a solid bar or blur. Turn on Auto-hide once and every later capture is covered automatically.
+- **Scrolling capture.** Choose **Capture Scrolling Area**, pick the area, then scroll: long pages, chats and docs are joined into one tall image as you go. Sticky headers and footers appear once, and the scroll bar is left out. **Auto-scroll** does the scrolling for you and stops at the bottom.
+- **Copy text.** **Capture Text** copies the words in any area instead of a picture. In the editor, press <kbd>⇧</kbd><kbd>⌘</kbd><kbd>C</kbd> to copy the text from a screenshot. All on your Mac.
+- **Pin to screen.** Float a screenshot above every window as a reference while you work. Drag to move, scroll to resize, double-click to close. Pin from the editor, the floating preview, or straight after capture.
+- **Never leak a secret.** Emails, API keys, tokens, card and phone numbers and IP addresses are found on your Mac (nothing is uploaded) and hidden in one click, with a solid bar or blur. Add your own words to hide too, such as client names or internal domains. Turn on Auto-hide once and every later capture is covered automatically.
 - **Styles.** Preview cards show your screenshot in each look: one-click looks for X, LinkedIn, Instagram, product launches, mobile apps, MacBook shots and docs, each with an exact export size. Save your own look as a style. Batch Export applies a style to a whole folder of screenshots.
 - **Browser frames and device mockups.** A Safari-style window with your URL in the address bar, or a MacBook or iPhone with their real screen shapes. Screen-shaped shots fill the display; a window sits on a Mac desktop; wide shots turn the iPhone landscape, and other tall shots get an iOS status bar. Combine them, like a browser on a MacBook.
 - **Straight to the result.** Each capture opens in the editor, already styled. Prefer to keep moving? Switch to a floating preview card in Settings and copy, save or drag without opening the editor.
@@ -153,9 +156,10 @@ Run the tests with `scripts/test.sh`. See [CONTRIBUTING.md](CONTRIBUTING.md) for
 ## Roadmap
 
 - Capture history with search by the text inside each screenshot
-- Copy text from a screenshot (on-device OCR)
 - Spotlight and magnifier annotations
-- Self-timer, scrolling capture and "capture the same area again"
+- Self-timer and "capture the same area again"
+- Swap hidden details for realistic fake ones instead of covering them
+- Short screen recordings and GIFs
 - JPEG and WebP export that fits each platform's size limit
 - Windows version (the style format is documented in [docs/composition-format.md](docs/composition-format.md) so it can share presets)
 

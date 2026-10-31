@@ -5,7 +5,7 @@ import Vision
 /// Something in a screenshot that probably shouldn't be posted: an email, an API key, a card number…
 public struct SensitiveFinding: Hashable, Sendable {
     public enum Kind: String, CaseIterable, Sendable {
-        case email, apiKey, token, cardNumber, phoneNumber, ipAddress
+        case email, apiKey, token, cardNumber, phoneNumber, ipAddress, customWord
 
         public var title: String {
             switch self {
@@ -15,6 +15,7 @@ public struct SensitiveFinding: Hashable, Sendable {
             case .cardNumber: "Card number"
             case .phoneNumber: "Phone number"
             case .ipAddress: "IP address"
+            case .customWord: "Word from your list"
             }
         }
 
@@ -23,6 +24,7 @@ public struct SensitiveFinding: Hashable, Sendable {
             switch self {
             case .apiKey: "API key"
             case .ipAddress: "IP address"
+            case .customWord: "word from your list"
             default: title.lowercased()
             }
         }
@@ -35,6 +37,7 @@ public struct SensitiveFinding: Hashable, Sendable {
             case .cardNumber: "card numbers"
             case .phoneNumber: "phone numbers"
             case .ipAddress: "IP addresses"
+            case .customWord: "words from your list"
             }
         }
     }
@@ -83,7 +86,9 @@ public struct SensitiveFinding: Hashable, Sendable {
 public enum SensitiveScanner {
     // MARK: Scanning images
 
-    public static func scan(_ image: CGImage) -> [SensitiveFinding] {
+    /// `customWords` are extra words or phrases to hide (client names, internal domains…), matched
+    /// anywhere in the text, ignoring case and accents.
+    public static func scan(_ image: CGImage, customWords: [String] = []) -> [SensitiveFinding] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         // Language correction "fixes" keys and addresses into words, so it stays off.
@@ -97,7 +102,7 @@ public enum SensitiveScanner {
         for observation in request.results ?? [] {
             guard let candidate = observation.topCandidates(1).first else { continue }
             let text = candidate.string
-            for match in matches(in: text) {
+            for match in matches(in: text, customWords: customWords) {
                 let box = (try? candidate.boundingBox(for: match.range))?.boundingBox ?? observation.boundingBox
                 // Vision boxes are normalised with a bottom-left origin.
                 var rect = CGRect(x: box.minX * width, y: (1 - box.maxY) * height,
@@ -149,7 +154,8 @@ public enum SensitiveScanner {
     }()
 
     /// Sensitive matches in one line of text, without overlaps (the first, most specific pattern wins).
-    public static func matches(in text: String) -> [Match] {
+    /// Words from the user's list are added on top, unless a built-in match already covers them.
+    public static func matches(in text: String, customWords: [String] = []) -> [Match] {
         var found: [Match] = []
         let ns = NSRange(text.startIndex..., in: text)
         for (kind, regex) in patterns {
@@ -166,6 +172,16 @@ public enum SensitiveScanner {
                     break
                 }
                 found.append(Match(range: range, kind: kind))
+            }
+        }
+        for word in customWords.map({ $0.trimmingCharacters(in: .whitespaces) }) where !word.isEmpty {
+            var searchStart = text.startIndex
+            while let range = text.range(of: word, options: [.caseInsensitive, .diacriticInsensitive],
+                                         range: searchStart ..< text.endIndex) {
+                if !found.contains(where: { $0.range.clamped(to: range) == range }) {
+                    found.append(Match(range: range, kind: .customWord))
+                }
+                searchStart = range.upperBound
             }
         }
         return found.sorted { $0.range.lowerBound < $1.range.lowerBound }

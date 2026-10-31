@@ -35,6 +35,7 @@ extension AppDelegate {
         let folder = prefs.saveFolder.appendingPathComponent("Screenshotty Batch \(formatter.string(from: Date()))", isDirectory: true)
         let autoHide = prefs.autoHideSensitive
         let hideKind = prefs.sensitiveHideKind
+        let words = prefs.hiddenWords
         let minimumLongSide = prefs.exportMinimumLongSide
         Toast.show("Exporting \(urls.count) images…", systemImage: "square.stack.3d.up.fill")
 
@@ -44,7 +45,7 @@ extension AppDelegate {
                 var count = 0
                 for url in urls {
                     guard let image = ImageLoader.load(url) else { continue }
-                    let marks = autoHide ? SensitiveScanner.scan(image).map { $0.annotation(hideKind) } : []
+                    let marks = autoHide ? SensitiveScanner.scan(image, customWords: words).map { $0.annotation(hideKind) } : []
                     guard let output = try? Compositor.compose(image, settings: settings, annotations: marks,
                                                                minimumLongSide: minimumLongSide) else { continue }
                     // shot.png and shot.jpg (or same-named files from two folders) each get their own file.

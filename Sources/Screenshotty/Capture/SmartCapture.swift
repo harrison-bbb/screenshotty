@@ -8,8 +8,24 @@ import SwiftUI
 /// Space: whole windows · Return: capture · Esc: cancel.
 @MainActor
 final class SmartCapture {
+    enum Purpose {
+        /// Take a screenshot of what's picked.
+        case capture
+        /// Only choose an area (for scrolling capture), then get out of the way.
+        case pickArea
+    }
+
+    /// An area chosen with `pickArea()`.
+    struct PickedArea {
+        /// Global top-left points.
+        let rect: CGRect
+        let screen: FrozenScreen
+    }
+
+    let purpose: Purpose
     private var overlays: [OverlayWindow] = []
     private var continuation: CheckedContinuation<CaptureResult, Never>?
+    private var areaContinuation: CheckedContinuation<PickedArea?, Never>?
     let detector: RegionDetector
     private let detectQueue = DispatchQueue(label: "screenshotty.detect", qos: .userInteractive)
     private var detecting = false
@@ -18,15 +34,35 @@ final class SmartCapture {
     private weak var pendingView: OverlayView?
     var windowsOnly = false
 
-    private init(screens: [FrozenScreen], detector: RegionDetector) {
+    private init(screens: [FrozenScreen], detector: RegionDetector, purpose: Purpose) {
         self.detector = detector
-        overlays = screens.map { OverlayWindow(frozen: $0) }
+        self.purpose = purpose
+        overlays = screens.map { OverlayWindow(frozen: $0, purpose: purpose) }
         overlays.forEach { $0.overlayView.controller = self }
     }
 
     /// Runs the picker. Returns nil if it couldn't start (e.g. ScreenCaptureKit unavailable), so the caller
     /// can fall back to the system picker.
     static func run() async -> CaptureResult? {
+        guard let capture = await prepare(.capture) else { return nil }
+        active = capture
+        return await withCheckedContinuation { continuation in
+            capture.continuation = continuation
+            capture.show()
+        }
+    }
+
+    /// Lets the user choose an area the same way, without capturing it. Returns nil if they cancel or the
+    /// picker couldn't start.
+    static func pickArea() async -> PickedArea? {
+        guard let picker = await prepare(.pickArea) else { return nil }
+        return await withCheckedContinuation { continuation in
+            picker.areaContinuation = continuation
+            picker.show()
+        }
+    }
+
+    private static func prepare(_ purpose: Purpose) async -> SmartCapture? {
         let windows = ScreenFreezer.windows()
         guard let screens = try? await ScreenFreezer.freeze(), !screens.isEmpty else { return nil }
         let detector = RegionDetector(windows: windows)
@@ -36,8 +72,7 @@ final class SmartCapture {
             DispatchQueue.global(qos: .userInitiated).async { _ = detector.sections(of: front) }
         }
         DispatchQueue.global(qos: .userInitiated).async { detector.enableWebStructure() }
-        let capture = SmartCapture(screens: screens, detector: detector)
-        active = capture
+        let capture = SmartCapture(screens: screens, detector: detector, purpose: purpose)
         for screen in screens {
             DispatchQueue.global(qos: .userInitiated).async {
                 detector.findTextBlocks(in: screen)
@@ -45,10 +80,7 @@ final class SmartCapture {
                 DispatchQueue.main.async { MainActor.assumeIsolated { capture.refreshHover() } }
             }
         }
-        return await withCheckedContinuation { continuation in
-            capture.continuation = continuation
-            capture.show()
-        }
+        return capture
     }
 
     private func show() {
@@ -100,6 +132,14 @@ final class SmartCapture {
     // MARK: Finishing
 
     func finish(rect: CGRect, windowID: CGWindowID?, on frozen: FrozenScreen) {
+        if purpose == .pickArea {
+            close()
+            // Hand focus back so the arrow keys and Space scroll the app under the area.
+            previousApp?.activate()
+            areaContinuation?.resume(returning: PickedArea(rect: rect, screen: frozen))
+            areaContinuation = nil
+            return
+        }
         // Hide the overlay but keep its windows until the editor is up. If Screenshotty had no windows for
         // a moment, macOS would hand focus to another app (often on another desktop) and pull you away.
         overlays.forEach {
@@ -154,6 +194,8 @@ final class SmartCapture {
     func cancel() {
         continuation?.resume(returning: .cancelled)
         continuation = nil
+        areaContinuation?.resume(returning: nil)
+        areaContinuation = nil
         dismiss(returnFocus: true)
     }
 
@@ -177,7 +219,7 @@ final class SmartCapture {
 final class OverlayWindow: NSWindow {
     let overlayView: OverlayView
 
-    init(frozen: FrozenScreen) {
+    init(frozen: FrozenScreen, purpose: SmartCapture.Purpose) {
         overlayView = OverlayView(frozen: frozen)
         super.init(contentRect: frozen.screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         level = .screenSaver
@@ -190,7 +232,7 @@ final class OverlayWindow: NSWindow {
         contentView = overlayView
         setFrame(frozen.screen.frame, display: false)
 
-        let hint = NSHostingView(rootView: CaptureHint())
+        let hint = NSHostingView(rootView: CaptureHint(purpose: purpose))
         hint.translatesAutoresizingMaskIntoConstraints = false
         overlayView.addSubview(hint)
         NSLayoutConstraint.activate([
@@ -470,11 +512,16 @@ final class OverlayView: NSView {
 // MARK: - Hint bar
 
 private struct CaptureHint: View {
+    let purpose: SmartCapture.Purpose
     @State private var smart = AXIsProcessTrusted()
 
     var body: some View {
         HStack(spacing: 14) {
-            hint("Click", "capture")
+            if purpose == .pickArea {
+                Text("Choose the area that scrolls").fontWeight(.semibold)
+                Divider().frame(height: 14)
+            }
+            hint("Click", purpose == .pickArea ? "choose" : "capture")
             hint("Drag", "select area")
             hint("Scroll", "bigger · smaller")
             hint("Space", "windows")

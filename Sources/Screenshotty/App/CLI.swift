@@ -22,6 +22,7 @@ enum CLI {
             settings = document.settings(unpackingInto: FileManager.default.temporaryDirectory.appendingPathComponent("screenshotty-assets"))
         }
         var redact = false
+        var hiddenWords: [String] = []
         var i = 0
 
         func value() -> String? {
@@ -118,6 +119,10 @@ enum CLI {
                 settings = document.style(unpackingInto: FileManager.default.temporaryDirectory.appendingPathComponent("screenshotty-assets")).settings
             case "--redact":
                 redact = true
+            case "--hide":
+                guard let v = value() else { return fail("Missing words to hide") }
+                hiddenWords += v.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                redact = true
             case "--frame":
                 guard let v = value().flatMap(FrameStyle.init(rawValue:)) else { return fail("Invalid frame") }
                 settings.frame = v
@@ -142,7 +147,7 @@ enum CLI {
         do {
             var annotations = project?.annotations ?? []
             if redact {
-                let findings = SensitiveScanner.scan(image)
+                let findings = SensitiveScanner.scan(image, customWords: hiddenWords)
                 annotations += findings.map(\.redaction)
                 for finding in findings { print("Redacted \(finding.kind.singularTitle): \(finding.masked)") }
             }
@@ -183,6 +188,7 @@ enum CLI {
       --logo <file>        Logo image in a corner of the canvas (with --watermark, the text follows it)
       --watermark-position \(Watermark.Position.allCases.map(\.rawValue).joined(separator: ", ")) (default bottomRight)
       --redact             Find emails, API keys, card numbers and similar, and cover them before export
+      --hide <words>       Also cover these words, comma separated, e.g. "Acme Corp, Jane Doe" (implies --redact)
       --frame <style>      none, hairline, glass
       --inner <units>      Even inner margin for screenshots on a plain background (default 40)
       --no-trim            Keep the screenshot exactly as captured (also keeps sloppy edges)

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Screenshotty: screenshots that look designed</title>
-<meta name="description" content="A free, open-source Mac app that turns any screenshot into a polished product shot: smart selection, beautiful backgrounds, device mockups and secrets hidden automatically.">
+<meta name="description" content="A free, open-source Mac app that turns any screenshot into a polished product shot: smart selection, scrolling capture, beautiful backgrounds, device mockups and secrets hidden automatically.">
 <meta property="og:title" content="Screenshotty: screenshots that look designed">
 <meta property="og:description" content="Free, open-source Mac app for beautiful, perfectly centred screenshots.">
 <meta property="og:image" content="https://harrison-bbb.github.io/screenshotty/images/after.jpg">
@@ -106,6 +106,11 @@
   .row li { display: flex; gap: 10px; color: var(--ink); font-size: 15.5px; }
   .row li::before { content: ""; flex: none; width: 20px; height: 20px; margin-top: 2px; border-radius: 6px; background: var(--accent-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-7' fill='none' stroke='%237060ee' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/16px no-repeat; }
   .media img { border-radius: 14px; box-shadow: var(--shadow), 0 0 0 1px var(--line); }
+  .scrollshot { position: relative; aspect-ratio: 4 / 5; max-height: 560px; margin: 0 auto; overflow: hidden; border-radius: 14px; background: #fff; box-shadow: var(--shadow), 0 0 0 1px var(--line); }
+  .scrollshot img { position: absolute; left: 0; top: 0; width: 100%; height: auto; border-radius: 0; box-shadow: none; animation: scroll-page 14s ease-in-out infinite alternate; }
+  @keyframes scroll-page { 0%, 8% { top: 0; transform: translateY(0); } 92%, 100% { top: 100%; transform: translateY(-100%); } }
+  @media (prefers-reduced-motion: reduce) { .scrollshot img { animation: none; } }
+  .scrollshot .badge { position: absolute; left: 14px; bottom: 14px; background: rgba(23,21,31,.82); color: #fff; font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 999px; backdrop-filter: blur(8px); }
   .duo { position: relative; padding: 0 12% 12% 0; }
   .duo img:last-child { position: absolute; right: 0; bottom: 0; width: 36%; border-radius: 12px; }
 
@@ -188,7 +193,7 @@
 <main>
   <div class="hero">
     <div class="wrap">
-      <a class="pill" href="https://github.com/harrison-bbb/screenshotty/releases/latest"><b>1.0</b> Out now, with automatic updates</a>
+      <a class="pill" href="https://github.com/harrison-bbb/screenshotty/releases/latest"><b>1.1</b> New: scrolling capture and copy text</a>
       <h1>Screenshots that look <span class="grad">designed.</span></h1>
       <p class="lede">Press one shortcut and Screenshotty captures exactly what you point at, then places it on a beautiful background, perfectly centred and ready to post. Free and open source, for every Mac.</p>
       <div class="cta-row">
@@ -240,6 +245,20 @@
     </section>
 
     <div id="features"></div>
+    <div class="row flip">
+      <div class="copy">
+        <div class="eyebrow">New in 1.1</div>
+        <h2>Capture the whole page, not just the screen</h2>
+        <p>Pick an area and scroll. Screenshotty joins the page into one tall image as you go: long AI replies, chats, docs and web pages, all in one picture.</p>
+        <ul>
+          <li>Sticky headers and footers appear once, not on every screen</li>
+          <li>Playing videos and floating chat bubbles don't break it</li>
+          <li>Auto-scroll does the scrolling for you and stops at the bottom</li>
+        </ul>
+      </div>
+      <div class="media"><div class="scrollshot"><img src="images/scrolling.jpg" width="900" height="2477" loading="lazy" alt="A long chat reply about a launch plan, captured top to bottom as one tall image"><span class="badge">One capture, five screens tall</span></div></div>
+    </div>
+
     <div class="row">
       <div class="copy">
         <div class="eyebrow">Privacy built in</div>
@@ -247,6 +266,7 @@
         <p>Screenshotty reads the text in every capture, on your Mac, and spots what shouldn't be shared. Hide it all with one click, or let it happen automatically.</p>
         <ul>
           <li>Emails, API keys, tokens, card and phone numbers, IP addresses</li>
+          <li>Your own words too: client names, people, internal domains</li>
           <li>Cover with a solid bar or a blur</li>
           <li>Auto-hide covers every future capture for you</li>
           <li>Nothing is ever uploaded</li>
@@ -296,6 +316,9 @@
         <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div><h3>Brand kit</h3><p>Add your logo and name once and every image carries a subtle watermark.</p></div>
         <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M9 14l2 2 4-4"/></svg></div><h3>Re-editable projects</h3><p>Save a project and reopen it later with the crop, marks and style intact. Perfect for docs you update.</p></div>
         <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></div><h3>Automatic updates</h3><p>A notification tells you when a new version is out. One click installs it, and your settings stay put.</p></div>
+        <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg></div><h3>Copy text</h3><p>Pick any area and copy the words in it instead of a picture. Works on any screenshot in the editor too.</p></div>
+        <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z"/></svg></div><h3>Pin to screen</h3><p>Float a screenshot above every window as a reference while you work. Drag it, resize it, fade it.</p></div>
+        <div class="card"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><path d="M4 20L20 4"/></svg></div><h3>Your hidden words</h3><p>Add client names or internal domains once, and they're covered in every capture alongside keys and emails.</p></div>
       </div>
     </section>
 
@@ -342,6 +365,7 @@
         <details><summary>Why does macOS warn me the first time?</summary><p>Apple shows that warning for apps that aren't registered through its $99 a year developer programme. Screenshotty skips that to stay free. Confirming once in Privacy &amp; Security tells your Mac you trust it. If you'd rather avoid the step, use the Terminal installer.</p></details>
         <details><summary>Are my screenshots uploaded anywhere?</summary><p>No. Everything, including text recognition and secret detection, happens on your Mac. The only thing Screenshotty fetches from the internet is the list of new versions.</p></details>
         <details><summary>How do updates work?</summary><p>Screenshotty checks for a new version once a day. When there is one, you get a notification and an item in the menu bar menu; one click shows what's new and installs it. Updates are signed, so your Mac only accepts genuine releases. You can turn this off in Settings.</p></details>
+        <details><summary>Can it capture a whole web page or a long chat?</summary><p>Yes. Choose Capture Scrolling Area from the menu bar, pick the area and scroll down; Screenshotty joins it into one tall image. Sticky headers appear once, and still sidebars aren't repeated. Auto-scroll can do the scrolling for you (it needs the Accessibility permission).</p></details>
         <details><summary>Which Macs does it work on?</summary><p>Any Mac running macOS 14 Sonoma or later, with Apple Silicon or Intel.</p></details>
         <details><summary>Can my team share a look?</summary><p>Yes. Save a style and send the file, or point everyone's Screenshotty at a shared folder (Google Drive, Dropbox, iCloud or a git repo) and its styles appear for the whole team. Add your logo in the brand kit for a consistent watermark.</p></details>
         <details><summary>Is there a Windows version?</summary><p>Not yet. The style format is documented so a Windows version can share styles later. Follow the project on GitHub to hear about it.</p></details>

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Regenerates the website pictures in site/images from made-up sample screens, using Screenshotty itself.
 # Run after UI changes so the site shows the current editor. Usage: scripts/site/make-images.sh
+# scrolling.jpg isn't made here: it's a real scrolling capture of scripts/site/chat.html (a made-up chat),
+# taken with the SCREENSHOTTY_SCROLL_TEST hook (see ScrollingCapture.swift) and scaled to 900 px wide.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 swift build -c release --product Screenshotty >/dev/null

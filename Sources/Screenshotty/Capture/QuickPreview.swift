@@ -124,8 +124,9 @@ final class QuickPreviewItem: ObservableObject {
 
     private func scan() {
         let source = source
+        let words = Preferences.shared.hiddenWords
         scanTask = Task { [weak self] in
-            let found = await Task.detached(priority: .userInitiated) { SensitiveScanner.scan(source) }.value
+            let found = await Task.detached(priority: .userInitiated) { SensitiveScanner.scan(source, customWords: words) }.value
             guard let self else { return }
             self.findings = found
             if Preferences.shared.autoHideSensitive, !found.isEmpty { self.hideSensitive() }
@@ -279,6 +280,13 @@ private struct QuickPreviewView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { item.edit() }
                 .onDrag { item.dragProvider() }
+                .contextMenu {
+                    Button("Copy Text") { TextCopier.copyText(from: item.source) }
+                    Button("Pin to Screen") {
+                        PinnedImages.pin(item.source)
+                        item.dismiss()
+                    }
+                }
                 .help("Click to edit, or drag into any app")
 
                 if !item.findings.isEmpty, !item.copied {

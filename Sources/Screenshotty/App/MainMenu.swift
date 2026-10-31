@@ -24,6 +24,8 @@ enum MainMenu {
         file.addItem(withTitle: "New Capture", action: #selector(AppDelegate.captureInteractive), keyEquivalent: "n")
         let full = file.addItem(withTitle: "Capture Full Screen", action: #selector(AppDelegate.captureFullScreen), keyEquivalent: "n")
         full.keyEquivalentModifierMask = [.command, .shift]
+        file.addItem(withTitle: "Capture Scrolling Area", action: #selector(AppDelegate.captureScrolling), keyEquivalent: "")
+        file.addItem(withTitle: "Capture Text", action: #selector(AppDelegate.captureText), keyEquivalent: "")
         file.addItem(withTitle: "Open…", action: #selector(AppDelegate.openImage), keyEquivalent: "o")
         file.addItem(withTitle: "Batch Export…", action: #selector(AppDelegate.batchExport), keyEquivalent: "")
         file.addItem(withTitle: "Import Style…", action: #selector(AppDelegate.importStyle), keyEquivalent: "")
@@ -43,6 +45,9 @@ enum MainMenu {
         redo.keyEquivalentModifierMask = [.command, .shift]
         edit.addItem(.separator())
         edit.addItem(withTitle: "Copy Image", action: #selector(EditorWindowController.copyImage(_:)), keyEquivalent: "c")
+        let copyText = edit.addItem(withTitle: "Copy Text", action: #selector(EditorWindowController.copyText(_:)), keyEquivalent: "c")
+        copyText.keyEquivalentModifierMask = [.command, .shift]
+        edit.addItem(withTitle: "Pin to Screen", action: #selector(EditorWindowController.pinToScreen(_:)), keyEquivalent: "")
         edit.addItem(withTitle: "Copy and Close", action: #selector(EditorWindowController.copyAndClose(_:)), keyEquivalent: "\r")
         edit.addItem(withTitle: "Paste Image", action: #selector(EditorWindowController.pasteImage(_:)), keyEquivalent: "v")
         let delete = edit.addItem(withTitle: "Delete Annotation", action: #selector(EditorWindowController.deleteAnnotation(_:)),

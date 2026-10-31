@@ -26,7 +26,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
             save: { [weak self] in self?.saveImage(nil) },
             saveAs: { [weak self] in self?.saveImageAs(nil) },
             saveProject: { [weak self] in self?.saveProject(nil) },
-            copyAndClose: { [weak self] in self?.copyAndClose(nil) })
+            copyAndClose: { [weak self] in self?.copyAndClose(nil) },
+            copyText: { [weak self] in self?.copyText(nil) },
+            pin: { [weak self] in self?.pinToScreen(nil) })
         window.contentViewController = NSHostingController(rootView: EditorView(model: model, actions: actions))
         window.setContentSize(NSSize(width: 1180, height: 760))
         window.delegate = self
@@ -123,6 +125,20 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSMenu
         }
     }
 
+    /// The part of the capture that's kept (after cropping), without the styling.
+    @MainActor private var keptCapture: CGImage {
+        model.crop.flatMap { model.source.cropping(to: $0) } ?? model.source
+    }
+
+    @MainActor @objc func copyText(_ sender: Any?) {
+        TextCopier.copyText(from: keptCapture)
+    }
+
+    /// Floats the screenshot above every window, to keep it in view while you work.
+    @MainActor @objc func pinToScreen(_ sender: Any?) {
+        PinnedImages.pin(keptCapture)
+    }
+
     @MainActor @objc func pasteImage(_ sender: Any?) {
         if let image = AppDelegate.clipboardImage() { model.replaceImage(image) }
     }
@@ -171,4 +187,6 @@ struct EditorActions {
     var saveAs: () -> Void
     var saveProject: () -> Void
     var copyAndClose: () -> Void
+    var copyText: () -> Void
+    var pin: () -> Void
 }

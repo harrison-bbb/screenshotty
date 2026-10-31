@@ -146,6 +146,14 @@ private struct ActionBar: View {
                 .foregroundStyle(.secondary)
             FixesChip(fixes: model.fixes)
             Spacer(minLength: 8)
+            Button(action: actions.copyText) {
+                Image(systemName: "text.viewfinder")
+            }
+            .help("Copy the text in the screenshot (⇧⌘C)")
+            Button(action: actions.pin) {
+                Image(systemName: "pin")
+            }
+            .help("Pin the screenshot on screen, above other windows")
             Menu {
                 Button("Save As…", action: actions.saveAs)
                 Divider()
@@ -187,6 +195,7 @@ private struct EditorShortcuts: View {
             Button("Save As", action: actions.saveAs).keyboardShortcut(on ? KeyboardShortcut("s", modifiers: [.command, .shift]) : nil)
             Button("Save Project", action: actions.saveProject).keyboardShortcut(on ? KeyboardShortcut("s", modifiers: [.command, .option]) : nil)
             Button("Copy and Close", action: actions.copyAndClose).keyboardShortcut(on ? KeyboardShortcut(.return) : nil)
+            Button("Copy Text", action: actions.copyText).keyboardShortcut(on ? KeyboardShortcut("c", modifiers: [.command, .shift]) : nil)
             Button("Undo") { model.undo() }.keyboardShortcut(on ? KeyboardShortcut("z") : nil)
             Button("Redo") { model.redo() }.keyboardShortcut(on ? KeyboardShortcut("z", modifiers: [.command, .shift]) : nil)
             Button("Paste Image") {

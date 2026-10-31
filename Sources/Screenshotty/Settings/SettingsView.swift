@@ -58,6 +58,18 @@ struct SettingsView: View {
             }
 
             Section {
+                TextField("Words to hide", text: $prefs.hiddenWordsText,
+                          prompt: Text("Acme Corp, Jane Doe, intranet.example.com"), axis: .vertical)
+                    .lineLimit(2 ... 6)
+            } header: {
+                Text("Your hidden words")
+            } footer: {
+                Text("Screenshotty looks for these too, along with emails, keys and card numbers, ignoring capitals. Put commas or new lines between them. They never leave this Mac.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 BrandKitEditor(kit: $prefs.brandKit)
             } header: {
                 Text("Brand kit")
