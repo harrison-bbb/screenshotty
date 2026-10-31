@@ -287,7 +287,7 @@ enum TextCopier {
     static func copyText(from image: CGImage) {
         Toast.show("Reading text…", systemImage: "text.viewfinder")
         Task {
-            let text = await Task.detached(priority: .userInitiated) { TextRecognizer.text(in: image) }.value
+            let text = await TextRecognizer.textInBackground(in: image)
             guard !text.isEmpty else {
                 Toast.show("No text found", systemImage: "exclamationmark.triangle.fill")
                 return

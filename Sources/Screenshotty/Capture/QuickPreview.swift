@@ -126,7 +126,7 @@ final class QuickPreviewItem: ObservableObject {
         let source = source
         let words = Preferences.shared.hiddenWords
         scanTask = Task { [weak self] in
-            let found = await Task.detached(priority: .userInitiated) { SensitiveScanner.scan(source, customWords: words) }.value
+            let found = await SensitiveScanner.scanInBackground(source, customWords: words)
             guard let self else { return }
             self.findings = found
             if Preferences.shared.autoHideSensitive, !found.isEmpty { self.hideSensitive() }

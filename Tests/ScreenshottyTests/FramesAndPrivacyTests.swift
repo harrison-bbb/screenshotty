@@ -56,10 +56,10 @@ enum Fake {
 }
 
 @Suite struct SensitiveScanTests {
-    @Test func locatesSecretsInAnImage() {
+    @Test func locatesSecretsInAnImage() async {
         let image = TestImages.text(["Owner: jamie.rivera@acme-corp.com", "Plan: Pro (monthly)",
                                      "Key: " + Fake.stripeKey])
-        let findings = SensitiveScanner.scan(image)
+        let findings = await SensitiveScanner.scanInBackground(image)
         #expect(Set(findings.map(\.kind)) == [.email, .apiKey])
         // The email is on the first line, the key on the third.
         if let email = findings.first(where: { $0.kind == .email }), let key = findings.first(where: { $0.kind == .apiKey }) {
@@ -68,11 +68,12 @@ enum Fake {
         }
     }
 
-    @Test func hidingCoversTheText() {
+    @Test func hidingCoversTheText() async {
         let image = TestImages.text(["Key: " + Fake.stripeKey])
-        let marks = SensitiveScanner.scan(image).map(\.redaction)
+        let marks = await SensitiveScanner.scanInBackground(image).map(\.redaction)
         #expect(!marks.isEmpty)
-        #expect(SensitiveScanner.scan(AnnotationRenderer.apply(marks, to: image, offset: .zero)).isEmpty)
+        let after = await SensitiveScanner.scanInBackground(AnnotationRenderer.apply(marks, to: image, offset: .zero))
+        #expect(after.isEmpty)
     }
 }
 

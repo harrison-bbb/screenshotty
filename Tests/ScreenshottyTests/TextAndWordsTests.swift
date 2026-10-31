@@ -15,9 +15,9 @@ import Testing
         #expect(TextRecognizer.arrange(lines) == "Hello  world\nSecond line\n\nNew paragraph")
     }
 
-    @Test func readsTextFromAnImage() {
+    @Test func readsTextFromAnImage() async {
         let image = TestImages.text(["Quarterly revenue grew", "Ship the update on Friday"])
-        let text = TextRecognizer.text(in: image)
+        let text = await TextRecognizer.textInBackground(in: image)
         #expect(text.contains("Quarterly revenue grew"))
         #expect(text.contains("Ship the update on Friday"))
         #expect(text.firstRange(of: "Quarterly")!.lowerBound < text.firstRange(of: "Ship")!.lowerBound)
@@ -37,9 +37,9 @@ import Testing
         #expect(matches.first?.kind == .email)
     }
 
-    @Test func hiddenWordsAreFoundInScreenshots() {
+    @Test func hiddenWordsAreFoundInScreenshots() async {
         let image = TestImages.text(["Meeting notes for Northwind", "Nothing secret here"])
-        let findings = SensitiveScanner.scan(image, customWords: ["northwind"])
+        let findings = await SensitiveScanner.scanInBackground(image, customWords: ["northwind"])
         #expect(findings.map(\.kind) == [.customWord])
         #expect(SensitiveFinding.summary(findings) == "1 word from your list")
     }

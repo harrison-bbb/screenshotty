@@ -135,7 +135,7 @@ final class EditorModel: ObservableObject {
         let image = source
         let words = Preferences.shared.hiddenWords
         scanTask = Task { [weak self] in
-            let found = await Task.detached(priority: .utility) { SensitiveScanner.scan(image, customWords: words) }.value
+            let found = await SensitiveScanner.scanInBackground(image, customWords: words)
             guard let self, !Task.isCancelled, image === self.source else { return }
             self.findings = found
             self.scanState = .done
