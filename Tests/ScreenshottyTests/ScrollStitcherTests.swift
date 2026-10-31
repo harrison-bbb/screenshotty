@@ -2,7 +2,7 @@ import CoreGraphics
 import Testing
 @testable import ScreenshottyCore
 
-@Suite struct ScrollStitcherTests {
+@Suite(.timeLimit(.minutes(1))) struct ScrollStitcherTests {
     static let width = 240
     static let view = 300          // visible height of the scrolling area
     static let header = 30

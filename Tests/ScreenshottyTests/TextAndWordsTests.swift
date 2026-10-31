@@ -3,7 +3,7 @@ import Testing
 @testable import ScreenshottyCore
 
 /// Copying text out of screenshots, and the user's own words to hide.
-@Suite struct TextAndWordsTests {
+@Suite(.timeLimit(.minutes(1))) struct TextAndWordsTests {
     @Test func linesComeOutInReadingOrder() {
         // Vision boxes: bottom-left origin, in no particular order.
         let lines = [
